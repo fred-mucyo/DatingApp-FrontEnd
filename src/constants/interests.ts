@@ -1,0 +1,17 @@
+export const INTEREST_TAGS: string[] = [
+  'Music',
+  'Sports',
+  'Gaming',
+  'Movies',
+  'Books',
+  'Travel',
+  'Food',
+  'Fitness',
+  'Art',
+  'Technology',
+  'Entrepreneurship',
+  'Parties',
+  'Outdoors',
+  'Volunteering',
+  'Study dates',
+];

@@ -1,0 +1,47 @@
+# Node / JavaScript
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Expo / React Native
+.expo/
+.expo-shared/
+.expo-dev/
+.expo-packager-cache/
+.expo-internal/
+web-build/
+android/
+ios/
+*.apk
+*.aab
+
+# TypeScript
+*.tsbuildinfo
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.log
+.DS_Store
+Thumbs.db
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# Coverage / tests
+coverage/
+.junit/
+
+# Misc build artifacts
+dist/
+build/
+*.orig
