@@ -7,13 +7,13 @@ import { Gender, RelationshipGoal, GenderPreference, Profile } from '../../types
 import { uploadImageToCloudinary } from '../../utils/cloudinary';
 import { supabase } from '../../config/supabaseClient';
 
-const MIN_PHOTOS = 3;
-const MAX_PHOTOS = 5;
+const MIN_PHOTOS = 1;
+const MAX_PHOTOS = 3;
 
 export const ProfileWizardScreen: React.FC = () => {
   const { user, refreshProfile } = useAuth();
   const [step, setStep] = useState(1);
-  const totalSteps = 6;
+  const totalSteps = 3;
 
   const [name, setName] = useState('');
   const [age, setAge] = useState('');
@@ -45,8 +45,6 @@ export const ProfileWizardScreen: React.FC = () => {
 
   const pickImage = async () => {
     try {
-      Alert.alert('Debug', 'pickImage called');
-
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
         Alert.alert('Permission needed', 'We need access to your photos to upload.');
@@ -79,16 +77,15 @@ export const ProfileWizardScreen: React.FC = () => {
   const canGoNext = () => {
     switch (step) {
       case 1:
-        return !!name && !!age && Number(age) >= 18;
+        return !!name && !!age && Number(age) >= 18 && !!city && !!country && bio.length <= 500;
       case 2:
-        return !!city && !!country && bio.length <= 500;
+        return (
+          !!relationshipGoal &&
+          !!genderPreference &&
+          interests.length >= 3 &&
+          interests.length <= 10
+        );
       case 3:
-        return !!relationshipGoal;
-      case 4:
-        return !!genderPreference;
-      case 5:
-        return interests.length >= 3 && interests.length <= 10;
-      case 6:
         return localPhotos.length >= MIN_PHOTOS && localPhotos.length <= MAX_PHOTOS;
       default:
         return false;
@@ -182,11 +179,7 @@ export const ProfileWizardScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        );
-      case 2:
-        return (
-          <View>
+
             <Text style={styles.label}>City</Text>
             <TextInput style={styles.input} value={city} onChangeText={setCity} />
             <Text style={styles.label}>Country</Text>
@@ -203,7 +196,7 @@ export const ProfileWizardScreen: React.FC = () => {
             <Text style={styles.helper}>{bio.length} / 500</Text>
           </View>
         );
-      case 3:
+      case 2:
         return (
           <View>
             <Text style={styles.label}>Relationship goal</Text>
@@ -218,11 +211,6 @@ export const ProfileWizardScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        );
-      case 4:
-        return (
-          <View>
             <Text style={styles.label}>Who do you want to match with?</Text>
             <View style={styles.chipRow}>
               {(['male', 'female', 'other', 'all'] as GenderPreference[]).map((g) => (
@@ -235,11 +223,6 @@ export const ProfileWizardScreen: React.FC = () => {
                 </TouchableOpacity>
               ))}
             </View>
-          </View>
-        );
-      case 5:
-        return (
-          <View style={{ flex: 1 }}>
             <Text style={styles.label}>Pick 3–10 interests</Text>
             <FlatList
               data={INTEREST_TAGS}
@@ -260,10 +243,13 @@ export const ProfileWizardScreen: React.FC = () => {
             <Text style={styles.helper}>Selected: {interests.length}</Text>
           </View>
         );
-      case 6:
+      case 3:
         return (
           <View>
-            <Text style={styles.label}>Upload {MIN_PHOTOS}-{MAX_PHOTOS} photos</Text>
+            <Text style={styles.label}>Add {MIN_PHOTOS}-{MAX_PHOTOS} profile photos</Text>
+            <Text style={styles.helper}>
+              The first photo will be used as your main profile picture across the app.
+            </Text>
             <View style={styles.photoRow}>
               {localPhotos.map((uri) => (
                 <TouchableOpacity key={uri} onPress={() => removePhoto(uri)}>
@@ -273,7 +259,7 @@ export const ProfileWizardScreen: React.FC = () => {
             </View>
             <Button title="Add photo" onPress={pickImage} />
             <Text style={styles.helper}>
-              Tap a photo to remove it. You must upload at least {MIN_PHOTOS} photos.
+              Tap a photo to remove it. You must upload at least {MIN_PHOTOS} photo and can have up to {MAX_PHOTOS} photos.
             </Text>
           </View>
         );

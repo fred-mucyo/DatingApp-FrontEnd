@@ -7,15 +7,15 @@ import { RootStackParamList } from '../../navigation/RootNavigator';
 export type LoginScreenProps = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
-  const { signInWithUsernamePassword, resetPasswordForEmail } = useAuth();
-  const [username, setUsername] = useState('');
+  const { signInWithIdentifierPassword, resetPasswordForEmail } = useAuth();
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [info, setInfo] = useState('');
 
   const handleSignIn = async () => {
-    if (!username.trim()) {
-      setInfo('Please enter your username.');
+    if (!identifier.trim()) {
+      setInfo('Please enter your email or username.');
       return;
     }
     if (!password) {
@@ -26,7 +26,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     setLoading(true);
     setInfo('');
     try {
-      await signInWithUsernamePassword(username.trim(), password);
+      await signInWithIdentifierPassword(identifier.trim(), password);
     } catch {
       // Error already surfaced via Alert in AuthContext
     } finally {
@@ -35,15 +35,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   };
 
   const handleForgotPassword = async () => {
-    if (!username.trim()) {
-      setInfo('Enter your email in the sign up form or type the email you registered with.');
+    if (!identifier.trim() || !identifier.includes('@')) {
+      setInfo('Please enter the email you registered with to reset your password.');
       return;
     }
 
     setLoading(true);
     setInfo('');
     try {
-      await resetPasswordForEmail(email.trim().toLowerCase());
+      await resetPasswordForEmail(identifier.trim().toLowerCase());
     } catch {
       // Error already surfaced via Alert
     } finally {
@@ -62,10 +62,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
         <TextInput
           style={styles.input}
-          placeholder="Username"
+          placeholder="Email or username"
           autoCapitalize="none"
-          value={username}
-          onChangeText={setUsername}
+          value={identifier}
+          onChangeText={setIdentifier}
         />
 
         <TextInput

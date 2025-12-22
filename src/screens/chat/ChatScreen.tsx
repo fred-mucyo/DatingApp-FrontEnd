@@ -125,6 +125,17 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
       if (messagesLeft !== null) {
         setMessagesLeft(Math.max(0, messagesLeft - 1));
       }
+      // Refresh messages so the newly-sent message appears immediately
+      try {
+        const updated = await fetchMessages(matchId, 100);
+        setMessages(updated);
+        setTimeout(scrollToBottom, 50);
+      } catch (e: any) {
+        // If this fails, the realtime subscription will still pick up the message,
+        // so we just surface a soft error.
+        // eslint-disable-next-line no-console
+        console.warn('Failed to refresh messages after send', e?.message ?? e);
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Failed to send message');
     } finally {

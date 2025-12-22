@@ -6,7 +6,10 @@ import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { ProfileWizardScreen } from '../screens/profile/ProfileWizardScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
+import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { MatchesScreen } from '../screens/chat/MatchesScreen';
+import { ViewUserProfileScreen } from '../screens/profile/ViewUserProfileScreen';
+import { MyProfileScreen } from '../screens/profile/MyProfileScreen';
 import { ChatScreen } from '../screens/chat/ChatScreen';
 
 export type RootStackParamList = {
@@ -15,7 +18,10 @@ export type RootStackParamList = {
   ProfileWizard: undefined;
   Home: undefined;
   Discovery: undefined;
+  Explore: undefined;
   Matches: undefined;
+  MyProfile: undefined;
+  ViewUserProfile: { userId: string };
   Chat: { matchId: string; otherUserId: string; otherUserName: string; otherUserPhoto?: string | null };
 };
 
@@ -67,9 +73,24 @@ export const RootNavigator = () => {
             options={{ title: 'Browse Matches (Beta)' }}
           />
           <Stack.Screen
+            name="Explore"
+            component={ExploreScreen}
+            options={{ title: 'Explore' }}
+          />
+          <Stack.Screen
             name="Matches"
             component={MatchesScreen}
             options={{ title: 'Messages (Beta)' }}
+          />
+          <Stack.Screen
+            name="MyProfile"
+            component={MyProfileScreen}
+            options={{ title: 'My profile' }}
+          />
+          <Stack.Screen
+            name="ViewUserProfile"
+            component={ViewUserProfileScreen}
+            options={{ title: 'User profile' }}
           />
           <Stack.Screen
             name="Chat"

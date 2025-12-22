@@ -11,7 +11,7 @@ interface AuthContextValue {
   profile: Profile | null;
   profileLoading: boolean;
   signUpWithEmailPassword: (email: string, password: string, username: string) => Promise<void>;
-  signInWithUsernamePassword: (username: string, password: string) => Promise<void>;
+  signInWithIdentifierPassword: (identifier: string, password: string) => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -80,6 +80,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUpWithEmailPassword = async (email: string, password: string, username: string) => {
+    // Enforce unique usernames
+    const { data: existing, error: usernameError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('username', username)
+      .maybeSingle();
+
+    if (usernameError && usernameError.code !== 'PGRST116') {
+      Alert.alert('Sign-up error', usernameError.message);
+      throw usernameError;
+    }
+
+    if (existing) {
+      Alert.alert('Sign-up error', 'This username is already taken. Please choose another one.');
+      throw new Error('Username already taken');
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -107,29 +124,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn('Error updating profile username during sign up', profileError.message);
     }
 
+    // Ensure user is not left logged in implicitly; they must sign in explicitly.
+    await supabase.auth.signOut();
+
     Alert.alert('Account created', 'Your account has been created. You can now sign in.');
   };
 
-  const signInWithUsernamePassword = async (username: string, password: string) => {
-    // Look up the user's email by username in the profiles table
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('username', username)
-      .maybeSingle();
+  const signInWithIdentifierPassword = async (identifier: string, password: string) => {
+    let emailToUse = identifier;
 
-    if (profileError) {
-      Alert.alert('Sign-in error', profileError.message);
-      throw profileError;
-    }
+    // If the user typed a username (no @), resolve it to an email via profiles
+    if (!identifier.includes('@')) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('username', identifier)
+        .maybeSingle();
 
-    if (!profile || !profile.email) {
-      Alert.alert('Sign-in error', 'User not found. Please check your username.');
-      throw new Error('User not found');
+      if (profileError) {
+        Alert.alert('Sign-in error', profileError.message);
+        throw profileError;
+      }
+
+      if (!profile || !profile.email) {
+        Alert.alert('Sign-in error', 'User not found. Please check your username or email.');
+        throw new Error('User not found');
+      }
+
+      emailToUse = profile.email;
     }
 
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: profile.email,
+      email: emailToUse,
       password,
     });
 
@@ -171,7 +197,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profile,
         profileLoading,
         signUpWithEmailPassword,
-        signInWithUsernamePassword,
+        signInWithIdentifierPassword,
         resetPasswordForEmail,
         signOut,
         refreshProfile,

@@ -63,6 +63,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
     try {
       await signUpWithEmailPassword(email.trim().toLowerCase(), password, username.trim());
+      navigation.navigate('Login');
     } catch {
       // Error already handled by AuthContext via Alert.
     } finally {

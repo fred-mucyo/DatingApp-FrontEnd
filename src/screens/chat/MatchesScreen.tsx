@@ -48,9 +48,7 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         {item.other_user_photo ? (
           <Image source={{ uri: item.other_user_photo }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarInitial}>{item.other_user_name.charAt(0)}</Text>
-          </View>
+          <View style={[styles.avatar, styles.avatarPlaceholder]} />
         )}
         <View style={styles.info}>
           <Text style={styles.name}>{item.other_user_name}</Text>
