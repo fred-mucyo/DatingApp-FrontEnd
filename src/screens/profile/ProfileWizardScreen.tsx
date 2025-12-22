@@ -44,24 +44,31 @@ export const ProfileWizardScreen: React.FC = () => {
   };
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'We need access to your photos to upload.');
-      return;
-    }
+    try {
+      Alert.alert('Debug', 'pickImage called');
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.7,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      if (localPhotos.length >= MAX_PHOTOS) {
-        Alert.alert('Limit reached', `You can upload up to ${MAX_PHOTOS} photos.`);
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'We need access to your photos to upload.');
         return;
       }
-      setLocalPhotos((prev) => [...prev, result.assets[0].uri]);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.7,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (localPhotos.length >= MAX_PHOTOS) {
+          Alert.alert('Limit reached', `You can upload up to ${MAX_PHOTOS} photos.`);
+          return;
+        }
+        setLocalPhotos((prev) => [...prev, result.assets[0].uri]);
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to open image picker');
+      console.error('pickImage error', e);
     }
   };
 
@@ -278,7 +285,11 @@ export const ProfileWizardScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.progress}>{progressLabel}</Text>
-      <ScrollView contentContainerStyle={styles.content}>{renderStep()}</ScrollView>
+      {step === 5 ? (
+        <View style={styles.content}>{renderStep()}</View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>{renderStep()}</ScrollView>
+      )}
       <View style={styles.footer}>
         <View style={styles.footerButtons}>
           {step > 1 && <Button title="Back" onPress={handleBack} />}
