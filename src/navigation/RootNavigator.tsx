@@ -8,6 +8,7 @@ import { HomeScreen } from '../screens/home/HomeScreen';
 import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
 import { ExploreScreen } from '../screens/explore/ExploreScreen';
 import { MatchesScreen } from '../screens/chat/MatchesScreen';
+import { LikesScreen } from '../screens/chat/LikesScreen';
 import { ViewUserProfileScreen } from '../screens/profile/ViewUserProfileScreen';
 import { MyProfileScreen } from '../screens/profile/MyProfileScreen';
 import { ChatScreen } from '../screens/chat/ChatScreen';
@@ -19,6 +20,7 @@ export type RootStackParamList = {
   Home: undefined;
   Discovery: undefined;
   Explore: undefined;
+  Likes: undefined;
   Matches: undefined;
   MyProfile: undefined;
   ViewUserProfile: { userId: string };
@@ -76,6 +78,11 @@ export const RootNavigator = () => {
             name="Explore"
             component={ExploreScreen}
             options={{ title: 'Explore' }}
+          />
+          <Stack.Screen
+            name="Likes"
+            component={LikesScreen}
+            options={{ title: 'Likes' }}
           />
           <Stack.Screen
             name="Matches"

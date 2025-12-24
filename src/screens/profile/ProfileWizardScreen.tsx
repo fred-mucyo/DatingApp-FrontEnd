@@ -11,7 +11,7 @@ const MIN_PHOTOS = 1;
 const MAX_PHOTOS = 3;
 
 export const ProfileWizardScreen: React.FC = () => {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, signOut } = useAuth();
   const [step, setStep] = useState(1);
   const totalSteps = 3;
 
@@ -102,6 +102,10 @@ export const ProfileWizardScreen: React.FC = () => {
 
   const handleBack = () => {
     if (step > 1) setStep((s) => s - 1);
+  };
+
+  const handleBackToLogin = async () => {
+    await signOut();
   };
 
   const handleSave = async () => {
@@ -278,6 +282,7 @@ export const ProfileWizardScreen: React.FC = () => {
       )}
       <View style={styles.footer}>
         <View style={styles.footerButtons}>
+          {step === 1 && <Button title="Back to login" onPress={handleBackToLogin} />}
           {step > 1 && <Button title="Back" onPress={handleBack} />}
           {step < totalSteps && (
             <Button title="Next" onPress={handleNext} disabled={!canGoNext()} />

@@ -487,7 +487,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.navLabel}>Explore</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Matches')}>
+            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Likes')}>
               <View style={styles.navIconCircle}>
                 <LikesNavIcon />
               </View>
