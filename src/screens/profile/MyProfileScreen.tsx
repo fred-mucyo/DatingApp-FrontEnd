@@ -16,7 +16,7 @@ const MIN_PHOTOS = 1;
 const MAX_PHOTOS = 3;
 
 export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, signOut } = useAuth();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -172,6 +172,23 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
     }
   };
 
+  const handleSignOut = () => {
+    Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Sign out',
+        style: 'destructive',
+        onPress: () => {
+          // We rely on AuthContext signOut to clear session and profile
+          // RootNavigator will then show the auth stack (Login screen).
+          signOut().catch(() => {
+            Alert.alert('Error', 'Failed to sign out. Please try again.');
+          });
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -214,67 +231,33 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
               placeholderTextColor="#9CA3AF"
             />
 
-            {/* <View style={styles.row}>
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Age</Text>
-                <TextInput
-                  style={styles.input}
-                  value={age}
-                  onChangeText={setAge}
-                  keyboardType="number-pad"
-                  placeholder="18+"
-                  placeholderTextColor="#9CA3AF"
-                />
-              </View>
-              <View style={styles.halfInput}>
-                <Text style={styles.label}>Gender</Text>
-                <View style={styles.chipRow}>
-                  {(['male', 'female', 'other'] as Gender[]).map((g) => (
-                    <TouchableOpacity
-                      key={g}
-                      style={[styles.chip, gender === g && styles.chipSelected]}
-                      onPress={() => setGender(g)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>
-                        {g.charAt(0).toUpperCase() + g.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </View> */}
-
-
-
             <View style={styles.halfInput}>
-  <Text style={styles.label}>Age</Text>
-  <TextInput
-    style={styles.input}
-    value={age}
-    onChangeText={setAge}
-    keyboardType="number-pad"
-    placeholder="18+"
-    placeholderTextColor="#9CA3AF"
-  />
-</View>
+              <Text style={styles.label}>Age</Text>
+              <TextInput
+                style={styles.input}
+                value={age}
+                onChangeText={setAge}
+                keyboardType="number-pad"
+                placeholder="18+"
+                placeholderTextColor="#9CA3AF"
+              />
+            </View>
 
-<Text style={styles.label}>Gender</Text>
-<View style={styles.chipRow}>
-  {(['male', 'female', 'other'] as Gender[]).map((g) => (
-    <TouchableOpacity
-      key={g}
-      style={[styles.chip, gender === g && styles.chipSelected]}
-      onPress={() => setGender(g)}
-      activeOpacity={0.7}
-    >
-      <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>
-        {g.charAt(0).toUpperCase() + g.slice(1)}
-      </Text>
-    </TouchableOpacity>
-  ))}
-</View>
-
+            <Text style={styles.label}>Gender</Text>
+            <View style={styles.chipRow}>
+              {(['male', 'female', 'other'] as Gender[]).map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, gender === g && styles.chipSelected]}
+                  onPress={() => setGender(g)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>
+                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={styles.label}>City</Text>
             <TextInput 
@@ -448,6 +431,14 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
             ) : (
               <Text style={styles.saveButtonText}>Save Changes</Text>
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.signOutButton}
+            onPress={handleSignOut}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.signOutButtonText}>Sign out</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -717,5 +708,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  signOutButton: {
+    marginTop: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  signOutButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 });
