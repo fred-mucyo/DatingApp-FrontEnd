@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Image, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../navigation/RootNavigator';
@@ -173,230 +174,548 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#F97316" />
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!profile) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.empty}>Profile not found.</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.center}>
+          <Text style={styles.empty}>Profile not found.</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>My profile</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>My Profile</Text>
+          <Text style={styles.subtitle}>Keep your profile up to date</Text>
+        </View>
 
-      <Text style={styles.label}>Name</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Basic Information</Text>
+          
+          <View style={styles.card}>
+            <Text style={styles.label}>Name</Text>
+            <TextInput 
+              style={styles.input} 
+              value={name} 
+              onChangeText={setName}
+              placeholder="Enter your name"
+              placeholderTextColor="#9CA3AF"
+            />
 
-      <Text style={styles.label}>Age (18+)</Text>
-      <TextInput
-        style={styles.input}
-        value={age}
-        onChangeText={setAge}
-        keyboardType="number-pad"
-      />
+            {/* <View style={styles.row}>
+              <View style={styles.halfInput}>
+                <Text style={styles.label}>Age</Text>
+                <TextInput
+                  style={styles.input}
+                  value={age}
+                  onChangeText={setAge}
+                  keyboardType="number-pad"
+                  placeholder="18+"
+                  placeholderTextColor="#9CA3AF"
+                />
+              </View>
+              <View style={styles.halfInput}>
+                <Text style={styles.label}>Gender</Text>
+                <View style={styles.chipRow}>
+                  {(['male', 'female', 'other'] as Gender[]).map((g) => (
+                    <TouchableOpacity
+                      key={g}
+                      style={[styles.chip, gender === g && styles.chipSelected]}
+                      onPress={() => setGender(g)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>
+                        {g.charAt(0).toUpperCase() + g.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </View> */}
 
-      <Text style={styles.label}>Gender</Text>
-      <View style={styles.chipRow}>
-        {(['male', 'female', 'other'] as Gender[]).map((g) => (
-          <TouchableOpacity
-            key={g}
-            style={[styles.chip, gender === g && styles.chipSelected]}
-            onPress={() => setGender(g)}
-          >
-            <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>{g}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
 
-      <Text style={styles.label}>City</Text>
-      <TextInput style={styles.input} value={city} onChangeText={setCity} />
-      <Text style={styles.label}>Country</Text>
-      <TextInput style={styles.input} value={country} onChangeText={setCountry} />
 
-      <Text style={styles.label}>Relationship goal</Text>
-      <View style={styles.chipRow}>
-        {(['serious', 'casual', 'both'] as RelationshipGoal[]).map((g) => (
-          <TouchableOpacity
-            key={g}
-            style={[styles.chip, relationshipGoal === g && styles.chipSelected]}
-            onPress={() => setRelationshipGoal(g)}
-          >
-            <Text style={relationshipGoal === g ? styles.chipTextSelected : styles.chipText}>{g}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+            <View style={styles.halfInput}>
+  <Text style={styles.label}>Age</Text>
+  <TextInput
+    style={styles.input}
+    value={age}
+    onChangeText={setAge}
+    keyboardType="number-pad"
+    placeholder="18+"
+    placeholderTextColor="#9CA3AF"
+  />
+</View>
 
-      <Text style={styles.label}>Who do you want to match with?</Text>
-      <View style={styles.chipRow}>
-        {(['male', 'female', 'other', 'all'] as GenderPreference[]).map((g) => (
-          <TouchableOpacity
-            key={g}
-            style={[styles.chip, genderPreference === g && styles.chipSelected]}
-            onPress={() => setGenderPreference(g)}
-          >
-            <Text style={genderPreference === g ? styles.chipTextSelected : styles.chipText}>{g}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+<Text style={styles.label}>Gender</Text>
+<View style={styles.chipRow}>
+  {(['male', 'female', 'other'] as Gender[]).map((g) => (
+    <TouchableOpacity
+      key={g}
+      style={[styles.chip, gender === g && styles.chipSelected]}
+      onPress={() => setGender(g)}
+      activeOpacity={0.7}
+    >
+      <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>
+        {g.charAt(0).toUpperCase() + g.slice(1)}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</View>
 
-      <Text style={styles.label}>Short bio (max 500 characters)</Text>
-      <TextInput
-        style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
-        value={bio}
-        onChangeText={setBio}
-        multiline
-        maxLength={500}
-      />
-      <Text style={styles.helper}>{bio.length} / 500</Text>
 
-      <Text style={styles.label}>Pick 3–10 interests</Text>
-      <View style={styles.chipRow}>
-        {INTEREST_TAGS.map((tag) => {
-          const selected = interests.includes(tag);
-          return (
-            <TouchableOpacity
-              key={tag}
-              style={[styles.chip, styles.interestChip, selected && styles.chipSelected]}
-              onPress={() => toggleInterest(tag)}
-            >
-              <Text style={selected ? styles.chipTextSelected : styles.chipText}>{tag}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      <Text style={styles.helper}>Selected: {interests.length}</Text>
+            <Text style={styles.label}>City</Text>
+            <TextInput 
+              style={styles.input} 
+              value={city} 
+              onChangeText={setCity}
+              placeholder="Enter your city"
+              placeholderTextColor="#9CA3AF"
+            />
+            
+            <Text style={styles.label}>Country</Text>
+            <TextInput 
+              style={styles.input} 
+              value={country} 
+              onChangeText={setCountry}
+              placeholder="Enter your country"
+              placeholderTextColor="#9CA3AF"
+            />
+          </View>
+        </View>
 
-      <Text style={styles.label}>Photos ({MIN_PHOTOS}-{MAX_PHOTOS})</Text>
-      <View style={styles.photoRow}>
-        {localPhotos.map((uri, index) => (
-          <View key={uri} style={styles.photoWrapper}>
-            <TouchableOpacity onPress={() => removePhoto(uri)}>
-              <Image source={{ uri }} style={styles.photo} />
-            </TouchableOpacity>
-            {index !== 0 && (
-              <TouchableOpacity onPress={() => setMainPhoto(uri)}>
-                <Text style={styles.setMain}>Set as main</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          
+          <View style={styles.card}>
+            <Text style={styles.label}>Relationship goal</Text>
+            <View style={styles.chipRow}>
+              {(['serious', 'casual', 'both'] as RelationshipGoal[]).map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, relationshipGoal === g && styles.chipSelected]}
+                  onPress={() => setRelationshipGoal(g)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={relationshipGoal === g ? styles.chipTextSelected : styles.chipText}>
+                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Who do you want to match with?</Text>
+            <View style={styles.chipRow}>
+              {(['male', 'female', 'other', 'all'] as GenderPreference[]).map((g) => (
+                <TouchableOpacity
+                  key={g}
+                  style={[styles.chip, genderPreference === g && styles.chipSelected]}
+                  onPress={() => setGenderPreference(g)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={genderPreference === g ? styles.chipTextSelected : styles.chipText}>
+                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>About You</Text>
+          
+          <View style={styles.card}>
+            <Text style={styles.label}>Short bio</Text>
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              value={bio}
+              onChangeText={setBio}
+              multiline
+              maxLength={500}
+              placeholder="Tell us about yourself..."
+              placeholderTextColor="#9CA3AF"
+            />
+            <Text style={styles.charCount}>{bio.length} / 500 characters</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Interests</Text>
+          <Text style={styles.sectionSubtitle}>Pick 3–10 interests</Text>
+          
+          <View style={styles.card}>
+            <View style={styles.chipRow}>
+              {INTEREST_TAGS.map((tag) => {
+                const selected = interests.includes(tag);
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[styles.chip, styles.interestChip, selected && styles.chipSelected]}
+                    onPress={() => toggleInterest(tag)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={selected ? styles.chipTextSelected : styles.chipText}>{tag}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.interestCounter}>
+              <Text style={styles.counterText}>
+                Selected: {interests.length} {interests.length < 3 && '(minimum 3)'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Photos</Text>
+          <Text style={styles.sectionSubtitle}>Add {MIN_PHOTOS}-{MAX_PHOTOS} photos</Text>
+          
+          <View style={styles.card}>
+            <View style={styles.photoGrid}>
+              {localPhotos.map((uri, index) => (
+                <View key={uri} style={styles.photoWrapper}>
+                  <TouchableOpacity 
+                    onPress={() => removePhoto(uri)}
+                    style={styles.photoContainer}
+                    activeOpacity={0.9}
+                  >
+                    <Image source={{ uri }} style={styles.photo} />
+                    <View style={styles.removeOverlay}>
+                      <Text style={styles.removeText}>✕</Text>
+                    </View>
+                  </TouchableOpacity>
+                  {index === 0 ? (
+                    <View style={styles.mainBadgeContainer}>
+                      <Text style={styles.mainBadge}>Main photo</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      onPress={() => setMainPhoto(uri)}
+                      style={styles.setMainButton}
+                    >
+                      <Text style={styles.setMainText}>Set as main</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ))}
+            </View>
+            
+            {localPhotos.length < MAX_PHOTOS && (
+              <TouchableOpacity 
+                style={styles.addPhotoButton}
+                onPress={pickImage}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.addPhotoIcon}>📷</Text>
+                <Text style={styles.addPhotoText}>Add photo</Text>
               </TouchableOpacity>
             )}
-            {index === 0 && <Text style={styles.mainBadge}>Main photo</Text>}
+            
+            <Text style={styles.photoHelper}>
+              Tap the ✕ to remove a photo. Use "Set as main" to choose your profile photo.
+            </Text>
           </View>
-        ))}
-      </View>
-      <Button title="Add photo" onPress={pickImage} />
-      <Text style={styles.helper}>
-        Tap a photo to remove it. Use "Set as main" to choose your main profile photo. You must
-        keep between {MIN_PHOTOS} and {MAX_PHOTOS} photos.
-      </Text>
+        </View>
 
-      <View style={styles.footer}>
-        <Button
-          title={saving || uploading ? 'Saving...' : 'Save changes'}
-          onPress={handleSave}
-          disabled={saving || uploading}
-        />
-      </View>
-    </ScrollView>
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={[styles.saveButton, (saving || uploading) && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={saving || uploading}
+            activeOpacity={0.8}
+          >
+            {(saving || uploading) ? (
+              <>
+                <ActivityIndicator color="#FFFFFF" style={styles.buttonLoader} />
+                <Text style={styles.saveButtonText}>
+                  {uploading ? 'Uploading photos...' : 'Saving...'}
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FAFAFA',
+  },
   container: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 15,
+    color: '#666666',
+    fontWeight: '500',
   },
   empty: {
     fontSize: 16,
-    color: '#555',
+    color: '#666666',
     textAlign: 'center',
+  },
+  header: {
+    marginBottom: 24,
+    alignItems: 'center',
   },
   title: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
-    marginBottom: 16,
-    textAlign: 'center',
+    marginBottom: 6,
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
+  },
+  subtitle: {
+    fontSize: 15,
+    color: '#666666',
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+    color: '#1A1A1A',
+    letterSpacing: -0.3,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000000',
+    shadowOpacity: 0.05,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 8,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   label: {
-    marginBottom: 4,
-    fontWeight: '600',
+    marginBottom: 8,
+    fontWeight: '700',
+    fontSize: 14,
+    color: '#1A1A1A',
+    letterSpacing: -0.2,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    fontSize: 15,
+    color: '#1A1A1A',
+    backgroundColor: '#FAFAFA',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  halfInput: {
+    width: '48%',
+  },
+  bioInput: {
+    height: 120,
+    textAlignVertical: 'top',
+    paddingTop: 14,
+  },
+  charCount: {
+    marginTop: -8,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'right',
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   chip: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     marginRight: 8,
     marginBottom: 8,
+    backgroundColor: '#FFFFFF',
   },
   chipSelected: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
+    backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
   },
   chipText: {
-    color: '#111827',
-  },
-  chipTextSelected: {
-    color: '#fff',
-  },
-  interestChip: {
-    // same visual style, but we allow wrapping
-  },
-  helper: {
-    marginTop: 4,
-    marginBottom: 12,
-    color: '#555',
-  },
-  photoRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 12,
-  },
-  photoWrapper: {
-    marginRight: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  setMain: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#2563eb',
-  },
-  mainBadge: {
-    marginTop: 4,
-    fontSize: 11,
-    color: '#16a34a',
+    color: '#666666',
+    fontSize: 14,
     fontWeight: '600',
   },
+  chipTextSelected: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  interestChip: {
+    // same visual style
+  },
+  interestCounter: {
+    marginTop: -8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  counterText: {
+    fontSize: 13,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  photoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  photoWrapper: {
+    marginRight: 12,
+    marginBottom: 12,
+  },
+  photoContainer: {
+    position: 'relative',
+  },
+  photo: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+  },
+  removeOverlay: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  mainBadgeContainer: {
+    marginTop: 6,
+    backgroundColor: '#10B981',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    alignSelf: 'center',
+  },
+  mainBadge: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  setMainButton: {
+    marginTop: 6,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    alignSelf: 'center',
+  },
+  setMainText: {
+    fontSize: 11,
+    color: '#6366F1',
+    fontWeight: '600',
+  },
+  addPhotoButton: {
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAFAFA',
+    marginBottom: 12,
+  },
+  addPhotoIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  addPhotoText: {
+    fontSize: 14,
+    color: '#666666',
+    fontWeight: '600',
+  },
+  photoHelper: {
+    fontSize: 12,
+    color: '#6B7280',
+    lineHeight: 18,
+  },
   footer: {
-    marginTop: 16,
+    marginTop: 8,
+  },
+  saveButton: {
+    backgroundColor: '#F97316',
+    borderRadius: 14,
+    paddingVertical: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F97316',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 4,
+    flexDirection: 'row',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    shadowOpacity: 0,
+  },
+  buttonLoader: {
+    marginRight: 8,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
