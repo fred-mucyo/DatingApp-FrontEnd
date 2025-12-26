@@ -47,11 +47,11 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   const [hasMatch, setHasMatch] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [likeMatchModalVisible, setLikeMatchModalVisible] = useState(false);
-  const [bioExpanded, setBioExpanded] = useState(false);
   const [myInterests, setMyInterests] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
 
   const screenWidth = Dimensions.get('window').width;
+  const screenHeight = Dimensions.get('window').height;
 
   useEffect(() => {
     const run = async () => {
@@ -101,7 +101,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator size="large" color="#F97316" />
       </View>
     );
   }
@@ -192,13 +192,13 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   const relationshipGoalLabel = (() => {
     switch (profile.relationship_goal) {
       case 'serious':
-        return 'Serious relationship';
+        return 'Serious';
       case 'casual':
-        return 'Casual dating';
+        return 'Casual';
       case 'both':
-        return 'Open to both';
+        return 'Both';
       default:
-        return 'Not specified';
+        return 'Open';
     }
   })();
 
@@ -209,28 +209,21 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
       case 'female':
         return 'Women';
       case 'other':
-        return 'Other genders';
+        return 'Other';
       case 'all':
         return 'Everyone';
       default:
-        return 'Not specified';
+        return 'All';
     }
   })();
 
-  const memberSinceLabel = profile.created_at
-    ? new Date(profile.created_at).toLocaleString(undefined, {
-        month: 'short',
-        year: 'numeric',
-      })
-    : 'Recently';
-
   const displayName = profile.name ?? 'Someone';
   const usernameLabel = profile.username ? `@${profile.username}` : undefined;
-  const locationLabel = profile.city && profile.country ? `${profile.city}, ${profile.country}` : undefined;
-  const interests = profile.interests && profile.interests.length > 0 ? profile.interests.slice(0, 10) : [];
+  const locationLabel = profile.city && profile.country ? `${profile.city}, ${profile.country}` : 'Location unknown';
+  const interests = profile.interests && profile.interests.length > 0 ? profile.interests.slice(0, 6) : [];
   const sharedInterests =
     profile.interests && myInterests.length > 0
-      ? profile.interests.filter((i) => myInterests.includes(i)).slice(0, 6)
+      ? profile.interests.filter((i) => myInterests.includes(i)).slice(0, 4)
       : [];
 
   const handleStartChat = async () => {
@@ -264,6 +257,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.root}>
+        {/* Photo carousel with full screen coverage */}
         <View style={styles.photoContainer}>
           {photos.length > 0 ? (
             <ScrollView
@@ -276,17 +270,19 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               {photos.map((uri, index) => (
                 <View key={uri + index} style={{ width: screenWidth }}>
                   <Image source={{ uri }} style={styles.mainPhoto} />
+                  {/* Bottom gradient for text readability */}
+                  <View style={styles.bottomGradient} />
                 </View>
               ))}
             </ScrollView>
           ) : (
             <View style={styles.photoPlaceholder}>
-              <Text style={styles.photoPlaceholderText}>No photos yet</Text>
+              <Text style={styles.photoPlaceholderText}>No photos</Text>
+              <View style={styles.bottomGradient} />
             </View>
           )}
 
-          <View style={styles.topOverlayGradient} />
-
+          {/* Top bar */}
           <View style={styles.topBar}>
             <TouchableOpacity
               style={styles.topBarButton}
@@ -305,8 +301,9 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             </TouchableOpacity>
           </View>
 
+          {/* Photo pagination */}
           {photos.length > 1 && (
-            <View style={styles.paginationPill}>
+            <View style={styles.paginationContainer}>
               {photos.map((_, index) => (
                 <View
                   key={index}
@@ -318,137 +315,69 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               ))}
             </View>
           )}
-        </View>
 
-        <ScrollView
-          style={styles.scrollContent}
-          contentContainerStyle={styles.scrollContentContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.contentCard}>
-            <View style={styles.basicHeaderRow}>
-              <View style={{ flex: 1 }}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.nameText}>
-                    {displayName}
-                    {profile.age ? `, ${profile.age}` : ''}
-                  </Text>
-                </View>
-                {usernameLabel && <Text style={styles.usernameText}>{usernameLabel}</Text>}
-                {locationLabel && (
-                  <View style={styles.locationRow}>
-                    <Text style={styles.locationIcon}>📍</Text>
-                    <Text style={styles.locationText}>{locationLabel}</Text>
-                  </View>
-                )}
-                <Text style={styles.statusText}>Active recently</Text>
+          {/* Profile info overlay at bottom of photo */}
+          <View style={styles.profileInfoOverlay}>
+            <View style={styles.nameSection}>
+              <View style={styles.nameRow}>
+                <Text style={styles.nameText}>
+                  {displayName}
+                  {profile.age ? `, ${profile.age}` : ''}
+                </Text>
+              </View>
+              {usernameLabel && <Text style={styles.usernameText}>{usernameLabel}</Text>}
+              <View style={styles.locationRow}>
+                <Text style={styles.locationIcon}>📍</Text>
+                <Text style={styles.locationText}>{locationLabel}</Text>
               </View>
             </View>
 
-            <View style={styles.statsRow}>
-              <View style={styles.statCard}>
+            {/* Compact stats row */}
+            <View style={styles.statsRowCompact}>
+              <View style={styles.statItem}>
                 <Text style={styles.statIcon}>💕</Text>
-                <Text style={styles.statLabel}>Looking for</Text>
-                <Text style={styles.statValue}>{relationshipGoalLabel}</Text>
+                <Text style={styles.statText}>{relationshipGoalLabel}</Text>
               </View>
-              <View style={styles.statCard}>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
                 <Text style={styles.statIcon}>❤️</Text>
-                <Text style={styles.statLabel}>Interested in</Text>
-                <Text style={styles.statValue}>{genderPreferenceLabel}</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statIcon}>📅</Text>
-                <Text style={styles.statLabel}>Member since</Text>
-                <Text style={styles.statValue}>{memberSinceLabel}</Text>
+                <Text style={styles.statText}>{genderPreferenceLabel}</Text>
               </View>
             </View>
 
-            {profile.bio ? (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About {displayName}</Text>
-                <Text
-                  style={styles.sectionBody}
-                  numberOfLines={bioExpanded ? undefined : 4}
-                >
+            {/* Bio section - condensed */}
+            {profile.bio && (
+              <View style={styles.bioSection}>
+                <Text style={styles.bioText} numberOfLines={2}>
                   {profile.bio}
                 </Text>
-                {profile.bio.length > 160 && (
-                  <TouchableOpacity
-                    onPress={() => setBioExpanded((prev) => !prev)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.readMoreText}>{bioExpanded ? 'Show less' : 'Read more'}</Text>
-                  </TouchableOpacity>
-                )}
               </View>
-            ) : null}
+            )}
 
+            {/* Shared interests highlight */}
             {hasMatch && sharedInterests.length > 0 && (
-              <View style={styles.section}>
-                <View style={styles.sharedCard}>
-                  <Text style={styles.sharedIcon}>✨</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sharedTitle}>You both like</Text>
-                    <View style={styles.sharedChipsWrap}>
-                      {sharedInterests.map((interest) => (
-                        <View key={interest} style={styles.sharedChip}>
-                          <Text style={styles.sharedChipText}>{interest}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </View>
+              <View style={styles.sharedInterestsCompact}>
+                <Text style={styles.sharedLabel}>✨ You both like: </Text>
+                <Text style={styles.sharedText}>
+                  {sharedInterests.slice(0, 3).join(', ')}
+                </Text>
               </View>
             )}
 
+            {/* Interests chips - compact */}
             {interests.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Interests</Text>
-                <View style={styles.interestsWrap}>
-                  {interests.map((interest) => (
-                    <View key={interest} style={styles.interestChip}>
-                      <Text style={styles.interestText}>{interest}</Text>
-                    </View>
-                  ))}
-                </View>
+              <View style={styles.interestsCompact}>
+                {interests.map((interest) => (
+                  <View key={interest} style={styles.interestChipCompact}>
+                    <Text style={styles.interestTextCompact}>{interest}</Text>
+                  </View>
+                ))}
               </View>
             )}
-
-            {locationLabel && (
-              <View style={styles.section}>
-                <View style={styles.distanceCard}>
-                  <Text style={styles.distanceIcon}>📍</Text>
-                  <Text style={styles.distanceText}>Near {locationLabel}</Text>
-                </View>
-              </View>
-            )}
-
-            <View style={styles.section}>
-              <TouchableOpacity
-                style={styles.safetyHeaderRow}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.sectionTitle}>Safety tips</Text>
-                <Text style={styles.safetyInfoIcon}>ℹ️</Text>
-              </TouchableOpacity>
-              <View style={styles.safetyCard}>
-                <View style={styles.safetyTipRow}>
-                  <Text style={styles.safetyBullet}>✓</Text>
-                  <Text style={styles.safetyTipText}>Meet in public places</Text>
-                </View>
-                <View style={styles.safetyTipRow}>
-                  <Text style={styles.safetyBullet}>✓</Text>
-                  <Text style={styles.safetyTipText}>Tell a friend your plans</Text>
-                </View>
-                <View style={styles.safetyTipRow}>
-                  <Text style={styles.safetyBullet}>✓</Text>
-                  <Text style={styles.safetyTipText}>Trust your instincts</Text>
-                </View>
-              </View>
-            </View>
           </View>
-        </ScrollView>
+        </View>
 
+        {/* Action buttons at bottom */}
         <View style={styles.bottomBar}>
           {hasMatch ? (
             <TouchableOpacity
@@ -457,7 +386,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               onPress={handleStartChat}
               disabled={actionLoading}
             >
-              <Text style={styles.primaryButtonText}>💬 Send message</Text>
+              <Text style={styles.primaryButtonText}>💬 Send Message</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.bottomButtonsRow}>
@@ -467,7 +396,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
                 onPress={() => navigation.goBack()}
                 disabled={actionLoading}
               >
-                <Text style={styles.passButtonText}>✕ Pass</Text>
+                <Text style={styles.passButtonText}>✕</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.primaryButton}
@@ -481,6 +410,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
           )}
         </View>
 
+        {/* Menu modal */}
         <Modal
           visible={menuVisible}
           transparent
@@ -517,6 +447,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
           </TouchableOpacity>
         </Modal>
 
+        {/* Match modal */}
         <Modal
           visible={likeMatchModalVisible}
           transparent
@@ -525,9 +456,9 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
         >
           <View style={styles.matchModalBackdrop}>
             <View style={styles.matchModalCard}>
-              <Text style={styles.matchTitle}>It&apos;s a match!</Text>
+              <Text style={styles.matchTitle}>🎉 It's a Match!</Text>
               <Text style={styles.matchSubtitle}>
-                You and {displayName} like each other.
+                You and {displayName} like each other
               </Text>
               <View style={styles.matchButtonsRow}>
                 <TouchableOpacity
@@ -535,14 +466,14 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
                   activeOpacity={0.9}
                   onPress={() => setLikeMatchModalVisible(false)}
                 >
-                  <Text style={styles.secondaryButtonText}>Keep swiping</Text>
+                  <Text style={styles.secondaryButtonText}>Keep Swiping</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryButton}
                   activeOpacity={0.9}
                   onPress={handleOpenChatFromModal}
                 >
-                  <Text style={styles.primaryButtonText}>Send message</Text>
+                  <Text style={styles.primaryButtonText}>Send Message</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -556,28 +487,28 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#020617',
+    backgroundColor: '#000000',
   },
   root: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: '#000000',
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
+    backgroundColor: '#000000',
   },
   empty: {
     fontSize: 16,
-    color: '#555',
+    color: '#9CA3AF',
     textAlign: 'center',
   },
   photoContainer: {
-    width: '100%',
-    aspectRatio: 4 / 5,
-    backgroundColor: '#020617',
+    flex: 1,
     position: 'relative',
+    backgroundColor: '#000000',
   },
   mainPhoto: {
     width: '100%',
@@ -588,110 +519,102 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#1F2933',
+    backgroundColor: '#1F2937',
   },
   photoPlaceholderText: {
-    color: '#9CA3AF',
-    fontSize: 14,
+    color: '#6B7280',
+    fontSize: 16,
   },
-  topOverlayGradient: {
+  bottomGradient: {
     position: 'absolute',
-    top: 0,
+    bottom: 0,
     left: 0,
     right: 0,
-    height: 120,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    height: 320,
+    backgroundColor: 'transparent',
+    background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.9))',
   },
   topBar: {
     position: 'absolute',
     top: 12,
     left: 16,
     right: 16,
-    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    zIndex: 10,
   },
   topBarButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+    backdropFilter: 'blur(10px)',
   },
   topBarIcon: {
-    color: '#F9FAFB',
-    fontSize: 20,
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '600',
   },
-  paginationPill: {
+  paginationContainer: {
     position: 'absolute',
-    bottom: 16,
+    top: 70,
     left: 0,
     right: 0,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 5,
   },
   paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(249, 250, 251, 0.7)',
-    backgroundColor: 'transparent',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
     marginHorizontal: 3,
   },
   paginationDotActive: {
-    backgroundColor: '#F9FAFB',
-  },
-  scrollContent: {
-    flex: 1,
-  },
-  scrollContentContainer: {
-    paddingTop: 16,
-    paddingBottom: 120,
-  },
-  contentCard: {
-    marginHorizontal: 16,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 24,
-    marginTop: -32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 8,
+    width: 20,
   },
-  basicHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
+  profileInfoOverlay: {
+    position: 'absolute',
+    bottom: 110,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    zIndex: 5,
+  },
+  nameSection: {
+    marginBottom: 12,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   nameText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   usernameText: {
-    marginTop: 4,
-    fontSize: 15,
-    color: '#6B7280',
+    marginTop: 2,
+    fontSize: 16,
+    color: '#E5E7EB',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   locationIcon: {
     fontSize: 14,
@@ -699,239 +622,178 @@ const styles = StyleSheet.create({
   },
   locationText: {
     fontSize: 15,
-    color: '#4B5563',
+    color: '#F3F4F6',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
-  statusText: {
-    marginTop: 4,
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  statsRow: {
+  statsRowCompact: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
+    backdropFilter: 'blur(10px)',
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 4,
-    justifyContent: 'space-between',
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statIcon: {
     fontSize: 16,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 2,
-  },
-  statValue: {
-    fontSize: 13,
-    color: '#111827',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  sectionBody: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#1F2933',
-  },
-  readMoreText: {
-    marginTop: 8,
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#F97316',
-  },
-  interestsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 4,
-  },
-  interestChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(248, 113, 113, 0.08)',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  interestText: {
-    fontSize: 13,
-    color: '#EA580C',
-  },
-  sharedCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
-  },
-  sharedIcon: {
-    fontSize: 18,
-    marginRight: 8,
-  },
-  sharedTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#065F46',
-    marginBottom: 6,
-  },
-  sharedChipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  sharedChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: '#059669',
     marginRight: 6,
-    marginBottom: 6,
   },
-  sharedChipText: {
-    fontSize: 12,
-    color: '#ECFDF5',
-  },
-  distanceCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-  },
-  distanceIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  distanceText: {
+  statText: {
     fontSize: 14,
-    color: '#4B5563',
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
-  safetyHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+  statDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginHorizontal: 12,
   },
-  safetyInfoIcon: {
-    fontSize: 16,
-  },
-  safetyCard: {
+  bioSection: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    backgroundColor: '#F9FAFB',
     padding: 12,
+    marginBottom: 10,
+    backdropFilter: 'blur(10px)',
   },
-  safetyTipRow: {
+  bioText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#F3F4F6',
+  },
+  sharedInterestsCompact: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    backgroundColor: 'rgba(16, 185, 129, 0.25)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+    backdropFilter: 'blur(10px)',
   },
-  safetyBullet: {
-    fontSize: 14,
-    color: '#10B981',
-    marginRight: 8,
-  },
-  safetyTipText: {
+  sharedLabel: {
     fontSize: 13,
-    color: '#4B5563',
+    color: '#6EE7B7',
+    fontWeight: '600',
+  },
+  sharedText: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  interestsCompact: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    maxHeight: 60,
+    overflow: 'hidden',
+  },
+  interestChipCompact: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(249, 115, 22, 0.25)',
+    backdropFilter: 'blur(10px)',
+  },
+  interestTextCompact: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '500',
   },
   bottomBar: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-    paddingTop: 12,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 28,
+    paddingTop: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backdropFilter: 'blur(20px)',
   },
   bottomButtonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
   },
   passButton: {
-    flexBasis: '30%',
-    height: 52,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: '#F97373',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: 'rgba(239, 68, 68, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
   },
   passButtonText: {
-    fontSize: 16,
+    fontSize: 24,
     color: '#EF4444',
     fontWeight: '600',
   },
   primaryButton: {
-    flexBasis: '65%',
-    height: 52,
-    borderRadius: 999,
+    flex: 1,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#F97316',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
   fullWidthButton: {
-    flexBasis: '100%',
+    flex: 1,
   },
   primaryButtonText: {
-    fontSize: 16,
+    fontSize: 17,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   menuBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   menuSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#1F2937',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingBottom: 24,
   },
   menuItem: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
   menuItemText: {
-    fontSize: 16,
-    color: '#111827',
+    fontSize: 17,
+    color: '#F3F4F6',
+    fontWeight: '500',
   },
   menuCancelItem: {
-    marginTop: 4,
+    marginTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   menuCancelText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 17,
+    color: '#9CA3AF',
     textAlign: 'center',
+    fontWeight: '500',
   },
   matchModalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 24,
@@ -939,43 +801,41 @@ const styles = StyleSheet.create({
   matchModalCard: {
     width: '100%',
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    backgroundColor: '#1F2937',
+    paddingHorizontal: 24,
+    paddingVertical: 32,
     alignItems: 'center',
   },
   matchTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#111827',
+    color: '#FFFFFF',
     marginBottom: 8,
   },
   matchSubtitle: {
-    fontSize: 15,
-    color: '#4B5563',
+    fontSize: 16,
+    color: '#D1D5DB',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   matchButtonsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 12,
     width: '100%',
-    marginTop: 8,
   },
   secondaryButton: {
-    flexBasis: '48%',
-    height: 48,
-    borderRadius: 999,
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
   secondaryButtonText: {
-    fontSize: 15,
-    color: '#111827',
-    fontWeight: '500',
+    fontSize: 16,
+    color: '#F3F4F6',
+    fontWeight: '600',
   },
 });
