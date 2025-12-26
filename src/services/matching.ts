@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../config/supabaseClient';
 
 const DAILY_SUGGESTIONS_KEY = 'matching.daily_suggestions';
+const PASSED_IDS_KEY = 'matching.passed_ids';
 
 export interface SuggestionProfile {
   id: string;
@@ -23,7 +24,108 @@ interface CachedSuggestions {
   profiles: SuggestionProfile[];
 }
 
-export const fetchSuggestionsRpc = async (
+// Very small helper: read list of profile ids the user has explicitly passed on (locally, per user).
+const getPassedProfileIds = async (userId: string): Promise<string[]> => {
+  const raw = await AsyncStorage.getItem(`${PASSED_IDS_KEY}:${userId}`);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+// Mark a profile as passed so we can avoid suggesting it again (per user).
+export const markProfilePassed = async (profileId: string): Promise<void> => {
+  const { data: sessionData, error: sErr } = await supabase.auth.getSession();
+  if (sErr || !sessionData.session) return;
+  const userId = sessionData.session.user.id;
+
+  const existing = await getPassedProfileIds(userId);
+  if (existing.includes(profileId)) return;
+  const next = [...existing, profileId];
+  await AsyncStorage.setItem(`${PASSED_IDS_KEY}:${userId}`, JSON.stringify(next));
+};
+
+// Fetch a broad set of candidate profiles and apply *only* minimal filtering
+// (self, blocked users, liked users, and locally passed users). Preferences
+// like gender/location are used only for simple ordering, not to exclude.
+const fetchLooseSuggestions = async (limit = 20): Promise<SuggestionProfile[]> => {
+  const { data: sessionData, error: sErr } = await supabase.auth.getSession();
+  if (sErr || !sessionData.session) throw new Error('Not authenticated');
+  const me = sessionData.session.user.id;
+
+  // Load current user's profile so we can order (not filter) by preferences.
+  const { data: myProfile } = await supabase
+    .from('profiles')
+    .select('gender, gender_preference, city, country, relationship_goal, interests')
+    .eq('id', me)
+    .maybeSingle();
+
+  const [profilesRes, likesRes, blocksRes, passedIds] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select(
+        'id, name, age, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos',
+      ),
+    supabase.from('likes').select('liked_id').eq('liker_id', me),
+    supabase
+      .from('blocks')
+      .select('blocker_id, blocked_id')
+      .or(`blocker_id.eq.${me},blocked_id.eq.${me}`),
+    getPassedProfileIds(me),
+  ]);
+
+  const allProfiles = (profilesRes.data as any[]) ?? [];
+  const likedIds = new Set(
+    ((likesRes.data as any[]) ?? [])
+      .map((row) => row.liked_id as string | null)
+      .filter((id): id is string => !!id),
+  );
+
+  const blockedIds = new Set<string>();
+  for (const row of (blocksRes.data as any[]) ?? []) {
+    const blocker = row.blocker_id as string;
+    const blocked = row.blocked_id as string;
+    const other = blocker === me ? blocked : blocker;
+    if (other) blockedIds.add(other);
+  }
+
+  const passedSet = new Set<string>(passedIds ?? []);
+
+  const filtered = allProfiles.filter((p) => {
+    const id = p.id as string;
+    if (!id || id === me) return false;
+    if (likedIds.has(id)) return false;
+    if (blockedIds.has(id)) return false;
+    if (passedSet.has(id)) return false;
+    return true;
+  });
+
+  // If nothing left after minimal filtering, just return everyone except self
+  // so the user still sees *something* in a tiny user base.
+  const candidates = filtered.length > 0 ? filtered : allProfiles.filter((p) => p.id !== me);
+
+  const myCity = (myProfile as any)?.city as string | null;
+  const myCountry = (myProfile as any)?.country as string | null;
+  const myGoal = (myProfile as any)?.relationship_goal as string | null;
+  const myGenderPref = (myProfile as any)?.gender_preference as string | null;
+
+  const scored = candidates.map((p) => {
+    let score = 0;
+    if (myCity && p.city === myCity) score += 4;
+    if (!score && myCountry && p.country === myCountry) score += 2;
+    if (myGoal && p.relationship_goal === myGoal) score += 1;
+    if (myGenderPref && p.gender === myGenderPref) score += 1;
+    return { profile: p as SuggestionProfile, score };
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, limit).map((s) => s.profile);
+};
+
+export const getDailySuggestions = async (
   ageWindow = 5,
   limit = 20,
 ): Promise<SuggestionProfile[]> => {
@@ -31,22 +133,9 @@ export const fetchSuggestionsRpc = async (
   if (sErr || !sessionData.session) throw new Error('Not authenticated');
   const userId = sessionData.session.user.id;
 
-  const { data, error } = await supabase.rpc('get_suggestions', {
-    p_user_id: userId,
-    p_age_window: ageWindow,
-    p_limit: limit,
-  });
-
-  if (error) throw error;
-  return (data as SuggestionProfile[]) ?? [];
-};
-
-export const getDailySuggestions = async (
-  ageWindow = 5,
-  limit = 20,
-): Promise<SuggestionProfile[]> => {
   const today = new Date().toISOString().substring(0, 10); // YYYY-MM-DD
-  const raw = await AsyncStorage.getItem(DAILY_SUGGESTIONS_KEY);
+  const cacheKey = `${DAILY_SUGGESTIONS_KEY}:${userId}`;
+  const raw = await AsyncStorage.getItem(cacheKey);
 
   if (raw) {
     try {
@@ -59,17 +148,21 @@ export const getDailySuggestions = async (
     }
   }
 
-  const profiles = await fetchSuggestionsRpc(ageWindow, limit);
+  // Use simplified, availability-first logic instead of strict RPC rules.
+  const profiles = await fetchLooseSuggestions(limit);
   const payload: CachedSuggestions = {
     generatedAt: today,
     profiles,
   };
-  await AsyncStorage.setItem(DAILY_SUGGESTIONS_KEY, JSON.stringify(payload));
+  await AsyncStorage.setItem(cacheKey, JSON.stringify(payload));
   return profiles;
 };
 
 export const clearDailySuggestionsCache = async () => {
-  await AsyncStorage.removeItem(DAILY_SUGGESTIONS_KEY);
+  const { data: sessionData } = await supabase.auth.getSession();
+  const userId = sessionData?.session?.user.id;
+  if (!userId) return;
+  await AsyncStorage.removeItem(`${DAILY_SUGGESTIONS_KEY}:${userId}`);
 };
 
 export const sendLike = async (targetProfileId: string) => {

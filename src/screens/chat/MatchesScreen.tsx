@@ -264,9 +264,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     backgroundColor: '#E5E7EB',
@@ -274,6 +274,7 @@ const styles = StyleSheet.create({
   avatarPlaceholder: {
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 24,
   },
   cardContent: {
     flex: 1,

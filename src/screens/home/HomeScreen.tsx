@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { RootStackParamList } from '../../navigation/RootNavigator';
-import { getDailySuggestions, SuggestionProfile, sendLike } from '../../services/matching';
+import { getDailySuggestions, SuggestionProfile, sendLike, markProfilePassed } from '../../services/matching';
 import { supabase } from '../../config/supabaseClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -93,64 +93,64 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [likesToday]);
 
   const loadSuggestions = useCallback(async () => {
-  setLoadingSuggestions(true);
-  try {
-    const data = await getDailySuggestions(5, 20);
-    console.log('HOME getDailySuggestions result:', {
-      count: data?.length ?? 0,
-      first: data && data.length > 0 ? data[0] : null,
-    });
+    setLoadingSuggestions(true);
+    try {
+      const data = await getDailySuggestions(5, 20);
+      console.log('HOME getDailySuggestions result:', {
+        count: data?.length ?? 0,
+        first: data && data.length > 0 ? data[0] : null,
+      });
 
-    // If RPC didn't include photos, enrich from profiles table
-    const enriched = await Promise.all(
-      (data ?? []).map(async (p) => {
-        const anyP: any = p as any;
-        const rawProfilePhotos = anyP.profile_photos;
+      // If RPC didn't include photos, enrich from profiles table
+      const enriched = await Promise.all(
+        (data ?? []).map(async (p) => {
+          const anyP: any = p as any;
+          const rawProfilePhotos = anyP.profile_photos;
 
-        const hasPhotosArray =
-          Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0;
-        const hasPhotosString =
-          typeof rawProfilePhotos === 'string' && !!rawProfilePhotos;
+          const hasPhotosArray =
+            Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0;
+          const hasPhotosString =
+            typeof rawProfilePhotos === 'string' && !!rawProfilePhotos;
 
-        if (hasPhotosArray || hasPhotosString) {
-          return p;
-        }
-
-        try {
-          const { data: prof, error } = await supabase
-            .from('profiles')
-            .select('photos')
-            .eq('id', p.id)
-            .maybeSingle();
-
-          if (
-            !error &&
-            prof &&
-            Array.isArray(prof.photos) &&
-            prof.photos.length > 0
-          ) {
-            return {
-              ...p,
-              profile_photos: prof.photos,
-            } as SuggestionProfile;
+          if (hasPhotosArray || hasPhotosString) {
+            return p;
           }
-        } catch (err) {
-          console.log('HOME enrich suggestion error:', { id: p.id, err });
-        }
 
-        return p;
-      }),
-    );
+          try {
+            const { data: prof, error } = await supabase
+              .from('profiles')
+              .select('photos')
+              .eq('id', p.id)
+              .maybeSingle();
 
-    setSuggestions(enriched);
-    setSuggestionIndex(0);
-  } catch (e: any) {
-    console.log('HOME getDailySuggestions error:', e);
-    Alert.alert('Error', e?.message ?? 'Failed to load suggestions');
-  } finally {
-    setLoadingSuggestions(false);
-  }
-}, []);
+            if (
+              !error &&
+              prof &&
+              Array.isArray(prof.photos) &&
+              prof.photos.length > 0
+            ) {
+              return {
+                ...p,
+                profile_photos: prof.photos,
+              } as SuggestionProfile;
+            }
+          } catch (err) {
+            console.log('HOME enrich suggestion error:', { id: p.id, err });
+          }
+
+          return p;
+        }),
+      );
+
+      setSuggestions(enriched);
+      setSuggestionIndex(0);
+    } catch (e: any) {
+      console.log('HOME getDailySuggestions error:', e);
+      Alert.alert('Error', e?.message ?? 'Failed to load suggestions');
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadLikesToday();
@@ -159,7 +159,16 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const visibleSuggestions = suggestions.slice(suggestionIndex, suggestionIndex + 5);
 
-  const handlePass = () => {
+  const handlePass = async (profileToPass?: SuggestionProfile) => {
+    // Marking a profile as passed is intentionally simple and local.
+    if (profileToPass) {
+      try {
+        await markProfilePassed(profileToPass.id);
+      } catch {
+        // If this fails, we still advance locally; it's not critical.
+      }
+    }
+
     if (suggestionIndex + 1 >= suggestions.length) {
       Alert.alert('End of feed', 'Come back tomorrow for new suggestions.');
     } else {
@@ -183,6 +192,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (isMatch) {
         Alert.alert("It's a match!", `You and ${profileToLike.name} like each other.`);
       }
+      // After a like we advance, similar to a pass; no extra tracking needed
+      // because likes are already excluded in the simplified suggestion query.
       handlePass();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to send like');
@@ -326,19 +337,23 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     const rawProfilePhotos = anyItem.profile_photos;
     const rawPhotos = anyItem.photos;
 
-    let photo: string | undefined;
+    const photos: string[] = [];
 
     if (Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0) {
-      photo = rawProfilePhotos[0];
+      photos.push(...rawProfilePhotos.filter((p: any) => typeof p === 'string'));
     } else if (typeof rawProfilePhotos === 'string' && rawProfilePhotos) {
-      photo = rawProfilePhotos;
-    } else if (Array.isArray(rawPhotos) && rawPhotos.length > 0) {
-      photo = rawPhotos[0];
-    } else if (typeof rawPhotos === 'string' && rawPhotos) {
-      photo = rawPhotos;
+      photos.push(rawProfilePhotos);
     }
 
-    if (!photo) {
+    if (photos.length === 0) {
+      if (Array.isArray(rawPhotos) && rawPhotos.length > 0) {
+        photos.push(...rawPhotos.filter((p: any) => typeof p === 'string'));
+      } else if (typeof rawPhotos === 'string' && rawPhotos) {
+        photos.push(rawPhotos);
+      }
+    }
+
+    if (photos.length === 0) {
       console.log('HOME renderSuggestionItem: no photo for item', {
         id: item.id,
         name: item.name,
@@ -346,26 +361,37 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         photos: rawPhotos,
       });
     } else {
-      console.log('HOME renderSuggestionItem: using photo', {
+      console.log('HOME renderSuggestionItem: using photos', {
         id: item.id,
         name: item.name,
-        photo,
+        count: photos.length,
       });
     }
+
     return (
       <View style={styles.cardContainer}>
-        {photo ? (
-          <Image
-            source={{ uri: photo }}
-            style={styles.fullScreenImage}
-            onError={(e) => {
-              console.log('HOME Image failed to load', {
-                id: item.id,
-                name: item.name,
-                photo,
-                error: e.nativeEvent,
-              });
-            }}
+        {photos.length > 0 ? (
+          // Local, lightweight photo swiping per profile.
+          <FlatList
+            data={photos}
+            keyExtractor={(uri) => uri}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            renderItem={({ item: uri }) => (
+              <Image
+                source={{ uri }}
+                style={styles.fullScreenImage}
+                onError={(e) => {
+                  console.log('HOME Image failed to load', {
+                    id: item.id,
+                    name: item.name,
+                    photo: uri,
+                    error: e.nativeEvent,
+                  });
+                }}
+              />
+            )}
           />
         ) : (
           <View style={[styles.fullScreenImage, styles.placeholderImage]}>
@@ -393,7 +419,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
             style={[styles.roundActionButton, styles.passButton]}
-            onPress={handlePass}
+            onPress={() => handlePass(item)}
             disabled={liking}
           >
             <PassIcon />
@@ -539,7 +565,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
-    backdropFilter: 'blur(10px)',
   },
   shareIcon: {
     fontSize: 20,

@@ -66,6 +66,13 @@ export const verifyMatchExists = async (
   const match = data as any;
   const other = match.user1_id === currentUserId ? match.user2 : match.user1;
 
+  const rawProfilePhotos = other.profile_photos as string[] | null | undefined;
+  const rawPhotos = (other as any).photos as string[] | null | undefined;
+  const otherPhoto =
+    (Array.isArray(rawProfilePhotos) && rawProfilePhotos[0]) ||
+    (Array.isArray(rawPhotos) && rawPhotos[0]) ||
+    null;
+
   return {
     id: match.id,
     user1_id: match.user1_id,
@@ -74,7 +81,7 @@ export const verifyMatchExists = async (
     other_user_id: other.id,
     other_user_name: other.name,
     other_user_age: other.age ?? null,
-    other_user_photo: (other.profile_photos && other.profile_photos[0]) || null,
+    other_user_photo: otherPhoto,
     last_message_content: null,
     last_message_created_at: null,
   };
@@ -94,6 +101,13 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
 
   for (const m of matches) {
     const other = m.user1_id === currentUserId ? m.user2 : m.user1;
+
+    const rawProfilePhotos = other.profile_photos as string[] | null | undefined;
+    const rawPhotos = (other as any).photos as string[] | null | undefined;
+    const otherPhoto =
+      (Array.isArray(rawProfilePhotos) && rawProfilePhotos[0]) ||
+      (Array.isArray(rawPhotos) && rawPhotos[0]) ||
+      null;
 
     // Skip blocked relationships (either direction)
     const { data: blocked } = await supabase
@@ -124,7 +138,7 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
       other_user_id: other.id,
       other_user_name: other.name,
       other_user_age: other.age ?? null,
-      other_user_photo: (other.profile_photos && other.profile_photos[0]) || null,
+      other_user_photo: otherPhoto,
       last_message_content: lastMsg?.content ?? null,
       last_message_created_at: lastMsg?.created_at ?? null,
     });
