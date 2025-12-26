@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
@@ -29,7 +30,7 @@ interface MessageItem {
 }
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
-  const { matchId, otherUserName, otherUserId } = route.params;
+  const { matchId, otherUserName, otherUserId, otherUserPhoto } = route.params;
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<MessageItem[]>([]);
@@ -261,11 +262,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
               navigation.navigate('ViewUserProfile', { userId: otherUserId })
             }
           >
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>
-                {otherUserName?.charAt(0)?.toUpperCase() || '?'}
-              </Text>
-            </View>
+            {otherUserPhoto ? (
+              <Image source={{ uri: otherUserPhoto }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarCircle}>
+                <Text style={styles.avatarInitial}>
+                  {otherUserName?.charAt(0)?.toUpperCase() || '?'}
+                </Text>
+              </View>
+            )}
             <View style={styles.headerTextBlock}>
               <Text style={styles.headerName} numberOfLines={1}>
                 {otherUserName}
@@ -304,11 +309,15 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
             </View>
           ) : messages.length === 0 ? (
             <View style={styles.emptyWrapper}>
-              <View style={styles.emptyAvatarLarge}>
-                <Text style={styles.emptyAvatarInitial}>
-                  {otherUserName?.charAt(0)?.toUpperCase() || '?'}
-                </Text>
-              </View>
+              {otherUserPhoto ? (
+                <Image source={{ uri: otherUserPhoto }} style={styles.emptyAvatarImage} />
+              ) : (
+                <View style={styles.emptyAvatarLarge}>
+                  <Text style={styles.emptyAvatarInitial}>
+                    {otherUserName?.charAt(0)?.toUpperCase() || '?'}
+                  </Text>
+                </View>
+              )}
               <Text style={styles.emptyTitle}>You matched with {otherUserName}!</Text>
               <Text style={styles.emptySubtitle}>Start the conversation</Text>
               <View style={styles.promptChipsRow}>
@@ -415,6 +424,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 8,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 8,
   },
   avatarCircle: {
     width: 40,
@@ -602,6 +617,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE4E6',
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyAvatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     marginBottom: 24,
   },
   emptyAvatarInitial: {

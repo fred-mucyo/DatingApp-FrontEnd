@@ -13,6 +13,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../config/supabaseClient';
 import { denyLike, fetchIncomingLikes, IncomingLikeProfile, likeBackAndRemove } from '../../services/likes';
 
 export type LikesScreenProps = NativeStackScreenProps<RootStackParamList, 'Likes'>;
@@ -28,7 +29,63 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
     setLoading(true);
     try {
       const data = await fetchIncomingLikes(user.id);
-      setItems(data);
+
+      const enriched = await Promise.all(
+        data.map(async (item) => {
+          const hasPhotosArray = Array.isArray(item.profile_photos) && item.profile_photos.length > 0;
+
+          if (hasPhotosArray) {
+            return item;
+          }
+
+          try {
+            const { data: prof, error } = await supabase
+              .from('profiles')
+              .select('photos')
+              .eq('id', item.user_id)
+              .maybeSingle();
+
+            if (
+              !error &&
+              prof &&
+              Array.isArray((prof as any).photos) &&
+              (prof as any).photos.length > 0
+            ) {
+              return {
+                ...item,
+                profile_photos: (prof as any).photos as string[],
+              };
+            }
+          } catch {
+            // ignore enrichment errors and fall back to existing data
+          }
+
+          return item;
+        }),
+      );
+
+      const userIds = enriched.map((item) => item.user_id);
+
+      let likedBackUserIds = new Set<string>();
+      if (userIds.length > 0) {
+        const { data: outgoingLikes, error: likesError } = await supabase
+          .from('likes')
+          .select('liked_id')
+          .eq('liker_id', user.id)
+          .in('liked_id', userIds);
+
+        if (!likesError && Array.isArray(outgoingLikes)) {
+          likedBackUserIds = new Set(
+            outgoingLikes
+              .map((row: any) => row.liked_id as string)
+              .filter((id): id is string => !!id),
+          );
+        }
+      }
+
+      const filtered = enriched.filter((item) => !likedBackUserIds.has(item.user_id));
+
+      setItems(filtered);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to load likes');
     } finally {
