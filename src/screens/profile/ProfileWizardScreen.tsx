@@ -38,7 +38,7 @@ export const ProfileWizardScreen: React.FC = () => {
   const toggleInterest = (tag: string) => {
     setInterests((prev) => {
       if (prev.includes(tag)) return prev.filter((t) => t !== tag);
-      if (prev.length >= 10) return prev; // max 10
+      if (prev.length >= 10) return prev;
       return [...prev, tag];
     });
   };
@@ -155,20 +155,37 @@ export const ProfileWizardScreen: React.FC = () => {
     }
   };
 
+  const getStepTitle = () => {
+    switch (step) {
+      case 1: return 'About You';
+      case 2: return 'Preferences & Interests';
+      case 3: return 'Your Photos';
+      default: return '';
+    }
+  };
+
   const renderStep = () => {
     switch (step) {
       case 1:
         return (
-          <View>
+          <View style={styles.stepContainer}>
             <Text style={styles.label}>Name</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} />
+            <TextInput 
+              style={styles.input} 
+              value={name} 
+              onChangeText={setName}
+              placeholder="Enter your name"
+              placeholderTextColor="#9CA3AF"
+            />
 
-            <Text style={styles.label}>Age (18+)</Text>
+            <Text style={styles.label}>Age</Text>
             <TextInput
               style={styles.input}
               value={age}
               onChangeText={setAge}
               keyboardType="number-pad"
+              placeholder="18+"
+              placeholderTextColor="#9CA3AF"
             />
 
             <Text style={styles.label}>Gender</Text>
@@ -179,43 +196,63 @@ export const ProfileWizardScreen: React.FC = () => {
                   style={[styles.chip, gender === g && styles.chipSelected]}
                   onPress={() => setGender(g)}
                 >
-                  <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>{g}</Text>
+                  <Text style={gender === g ? styles.chipTextSelected : styles.chipText}>
+                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
 
             <Text style={styles.label}>City</Text>
-            <TextInput style={styles.input} value={city} onChangeText={setCity} />
+            <TextInput 
+              style={styles.input} 
+              value={city} 
+              onChangeText={setCity}
+              placeholder="Your city"
+              placeholderTextColor="#9CA3AF"
+            />
+            
             <Text style={styles.label}>Country</Text>
-            <TextInput style={styles.input} value={country} onChangeText={setCountry} />
+            <TextInput 
+              style={styles.input} 
+              value={country} 
+              onChangeText={setCountry}
+              placeholder="Your country"
+              placeholderTextColor="#9CA3AF"
+            />
 
-            <Text style={styles.label}>Short bio (max 500 characters)</Text>
+            <Text style={styles.label}>Bio</Text>
             <TextInput
-              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+              style={[styles.input, styles.bioInput]}
               value={bio}
               onChangeText={setBio}
               multiline
               maxLength={500}
+              placeholder="Tell us about yourself..."
+              placeholderTextColor="#9CA3AF"
             />
-            <Text style={styles.helper}>{bio.length} / 500</Text>
+            <Text style={styles.charCount}>{bio.length} / 500</Text>
           </View>
         );
       case 2:
         return (
-          <View>
-            <Text style={styles.label}>Relationship goal</Text>
+          <View style={styles.stepContainer}>
+            <Text style={styles.label}>What are you looking for?</Text>
             <View style={styles.chipRow}>
               {(['serious', 'casual', 'both'] as RelationshipGoal[]).map((g) => (
                 <TouchableOpacity
                   key={g}
-                  style={[styles.chip, relationshipGoal === g && styles.chipSelected]}
+                  style={[styles.chip, styles.fullWidthChip, relationshipGoal === g && styles.chipSelected]}
                   onPress={() => setRelationshipGoal(g)}
                 >
-                  <Text style={relationshipGoal === g ? styles.chipTextSelected : styles.chipText}>{g}</Text>
+                  <Text style={relationshipGoal === g ? styles.chipTextSelected : styles.chipText}>
+                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.label}>Who do you want to match with?</Text>
+            
+            <Text style={styles.label}>Interested in</Text>
             <View style={styles.chipRow}>
               {(['male', 'female', 'other', 'all'] as GenderPreference[]).map((g) => (
                 <TouchableOpacity
@@ -223,48 +260,64 @@ export const ProfileWizardScreen: React.FC = () => {
                   style={[styles.chip, genderPreference === g && styles.chipSelected]}
                   onPress={() => setGenderPreference(g)}
                 >
-                  <Text style={genderPreference === g ? styles.chipTextSelected : styles.chipText}>{g}</Text>
+                  <Text style={genderPreference === g ? styles.chipTextSelected : styles.chipText}>
+                    {g.charAt(0).toUpperCase() + g.slice(1)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+            
             <Text style={styles.label}>Pick 3–10 interests</Text>
-            <FlatList
-              data={INTEREST_TAGS}
-              keyExtractor={(item) => item}
-              numColumns={2}
-              renderItem={({ item }) => {
+            <View style={styles.interestsGrid}>
+              {INTEREST_TAGS.map((item) => {
                 const selected = interests.includes(item);
                 return (
                   <TouchableOpacity
+                    key={item}
                     style={[styles.chip, styles.interestChip, selected && styles.chipSelected]}
                     onPress={() => toggleInterest(item)}
                   >
                     <Text style={selected ? styles.chipTextSelected : styles.chipText}>{item}</Text>
                   </TouchableOpacity>
                 );
-              }}
-            />
-            <Text style={styles.helper}>Selected: {interests.length}</Text>
+              })}
+            </View>
+            <Text style={styles.interestCount}>{interests.length} selected</Text>
           </View>
         );
       case 3:
         return (
-          <View>
-            <Text style={styles.label}>Add {MIN_PHOTOS}-{MAX_PHOTOS} profile photos</Text>
-            <Text style={styles.helper}>
-              The first photo will be used as your main profile picture across the app.
+          <View style={styles.stepContainer}>
+            <Text style={styles.label}>Add your photos</Text>
+            <Text style={styles.subLabel}>
+              Add {MIN_PHOTOS}-{MAX_PHOTOS} photos. Your first photo will be your main profile picture.
             </Text>
-            <View style={styles.photoRow}>
-              {localPhotos.map((uri) => (
-                <TouchableOpacity key={uri} onPress={() => removePhoto(uri)}>
+            
+            <View style={styles.photoGrid}>
+              {localPhotos.map((uri, index) => (
+                <View key={uri} style={styles.photoContainer}>
                   <Image source={{ uri }} style={styles.photo} />
-                </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => removePhoto(uri)}
+                  >
+                    <Text style={styles.removeButtonText}>✕</Text>
+                  </TouchableOpacity>
+                  {index === 0 && (
+                    <View style={styles.mainBadge}>
+                      <Text style={styles.mainBadgeText}>Main</Text>
+                    </View>
+                  )}
+                </View>
               ))}
+              
+              {localPhotos.length < MAX_PHOTOS && (
+                <TouchableOpacity style={styles.addPhotoButton} onPress={pickImage}>
+                  <Text style={styles.addPhotoIcon}>+</Text>
+                  <Text style={styles.addPhotoText}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
             </View>
-            <Button title="Add photo" onPress={pickImage} />
-            <Text style={styles.helper}>
-              Tap a photo to remove it. You must upload at least {MIN_PHOTOS} photo and can have up to {MAX_PHOTOS} photos.
-            </Text>
           </View>
         );
       default:
@@ -274,25 +327,64 @@ export const ProfileWizardScreen: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.progress}>{progressLabel}</Text>
-      {step === 5 ? (
+      <View style={styles.header}>
+        <View style={styles.progressBar}>
+          {[1, 2, 3].map((s) => (
+            <View
+              key={s}
+              style={[
+                styles.progressSegment,
+                s <= step && styles.progressSegmentActive,
+              ]}
+            />
+          ))}
+        </View>
+        <Text style={styles.stepTitle}>{getStepTitle()}</Text>
+        <Text style={styles.stepSubtitle}>{progressLabel}</Text>
+      </View>
+
+      {step === 2 ? (
         <View style={styles.content}>{renderStep()}</View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>{renderStep()}</ScrollView>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {renderStep()}
+        </ScrollView>
       )}
+
       <View style={styles.footer}>
+        {step === 1 && (
+          <TouchableOpacity style={styles.backToLoginButton} onPress={handleBackToLogin}>
+            <Text style={styles.backToLoginText}>Back to login</Text>
+          </TouchableOpacity>
+        )}
+        
         <View style={styles.footerButtons}>
-          {step === 1 && <Button title="Back to login" onPress={handleBackToLogin} />}
-          {step > 1 && <Button title="Back" onPress={handleBack} />}
-          {step < totalSteps && (
-            <Button title="Next" onPress={handleNext} disabled={!canGoNext()} />
+          {step > 1 && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleBack}>
+              <Text style={styles.secondaryButtonText}>Back</Text>
+            </TouchableOpacity>
           )}
+          
+          {step < totalSteps && (
+            <TouchableOpacity 
+              style={[styles.primaryButton, !canGoNext() && styles.buttonDisabled]} 
+              onPress={handleNext}
+              disabled={!canGoNext()}
+            >
+              <Text style={styles.primaryButtonText}>Next</Text>
+            </TouchableOpacity>
+          )}
+          
           {step === totalSteps && (
-            <Button
-              title={saving || uploading ? 'Saving...' : 'Finish'}
+            <TouchableOpacity
+              style={[styles.primaryButton, (saving || uploading || !canGoNext()) && styles.buttonDisabled]}
               onPress={handleSave}
               disabled={saving || uploading || !canGoNext()}
-            />
+            >
+              <Text style={styles.primaryButtonText}>
+                {saving || uploading ? 'Saving...' : 'Finish'}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -301,76 +393,251 @@ export const ProfileWizardScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  progress: {
-    textAlign: 'center',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 40,
+    paddingBottom: 12,
+    backgroundColor: '#FAFAFA',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  progressBar: {
+    flexDirection: 'row',
+    gap: 8,
     marginBottom: 8,
-    fontSize: 14,
-    color: '#555',
+  },
+  progressSegment: {
+    flex: 1,
+    height: 3,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+  },
+  progressSegmentActive: {
+    backgroundColor: '#F97316',
+  },
+  stepTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  stepSubtitle: {
+    fontSize: 12,
+    color: '#666666',
+    fontWeight: '500',
   },
   content: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 16,
     paddingBottom: 16,
   },
+  stepContainer: {
+    flex: 1,
+  },
   label: {
-    marginBottom: 4,
+    fontSize: 15,
     fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 6,
+    marginTop: 10,
+  },
+  subLabel: {
+    fontSize: 13,
+    color: '#666666',
+    marginBottom: 10,
+    marginTop: -2,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 15,
+    color: '#1A1A1A',
+    backgroundColor: '#FFFFFF',
+  },
+  bioInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  charCount: {
+    textAlign: 'right',
+    fontSize: 12,
+    color: '#9CA3AF',
+    marginTop: 4,
   },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    gap: 8,
+    marginBottom: 4,
   },
   chip: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 8,
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  fullWidthChip: {
+    flex: 1,
+    alignItems: 'center',
   },
   chipSelected: {
-    backgroundColor: '#111827',
-    borderColor: '#111827',
+    backgroundColor: '#F97316',
+    borderColor: '#F97316',
   },
   chipText: {
-    color: '#111827',
+    color: '#1A1A1A',
+    fontSize: 14,
+    fontWeight: '600',
   },
   chipTextSelected: {
-    color: '#fff',
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  interestsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
   },
   interestChip: {
     flex: 1,
+    minWidth: '45%',
+    alignItems: 'center',
   },
-  helper: {
+  interestCount: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#F97316',
+    fontWeight: '600',
     marginTop: 8,
-    color: '#555',
   },
-  photoRow: {
+  photoGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 12,
+    gap: 10,
+    marginTop: 12,
+  },
+  photoContainer: {
+    position: 'relative',
+    width: 105,
+    height: 140,
   },
   photo: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: 8,
+    width: '100%',
+    height: '100%',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+  },
+  removeButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  mainBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: '#F97316',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  mainBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  addPhotoButton: {
+    width: 105,
+    height: 140,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  addPhotoIcon: {
+    fontSize: 28,
+    color: '#9CA3AF',
+    marginBottom: 4,
+  },
+  addPhotoText: {
+    fontSize: 11,
+    color: '#666666',
+    fontWeight: '600',
   },
   footer: {
-    paddingVertical: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  backToLoginButton: {
+    alignItems: 'center',
+    paddingVertical: 10,
+    marginBottom: 10,
+  },
+  backToLoginText: {
+    color: '#6366F1',
+    fontSize: 14,
+    fontWeight: '600',
   },
   footerButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: '#F97316',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  secondaryButton: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: {
+    color: '#1A1A1A',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
   },
 });

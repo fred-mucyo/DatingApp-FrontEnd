@@ -170,11 +170,22 @@ export const sendLike = async (targetProfileId: string) => {
   if (sErr || !sessionData.session) throw new Error('Not authenticated');
   const me = sessionData.session.user.id;
 
-  const { error: likeError } = await supabase.from('likes').insert({
-    liker_id: me,
-    liked_id: targetProfileId,
-  });
-  if (likeError) throw likeError;
+  const { data: existing, error: existingError } = await supabase
+    .from('likes')
+    .select('id')
+    .eq('liker_id', me)
+    .eq('liked_id', targetProfileId)
+    .maybeSingle();
+
+  if (!existing) {
+    if (existingError) throw existingError;
+
+    const { error: likeError } = await supabase.from('likes').insert({
+      liker_id: me,
+      liked_id: targetProfileId,
+    });
+    if (likeError) throw likeError;
+  }
 
   const { data: match, error: matchError } = await supabase
     .from('matches')

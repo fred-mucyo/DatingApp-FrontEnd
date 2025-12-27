@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -38,6 +39,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [liking, setLiking] = useState(false);
   const [likesToday, setLikesToday] = useState<{ date: string; count: number } | null>(null);
+  const [locallyLikedIds, setLocallyLikedIds] = useState<string[]>([]);
 
   const greetingName = profile?.name || user?.email || 'there';
 
@@ -145,6 +147,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
       setSuggestions(enriched);
       console.log('HOME suggestions length after enrich:', enriched.length);
+      setLocallyLikedIds([]);
       setSuggestionIndex(0);
     } catch (e: any) {
       console.log('HOME getDailySuggestions error:', e);
@@ -190,6 +193,10 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const { isMatch } = await sendLike(profileToLike.id);
       await incrementLikesToday();
+
+      setLocallyLikedIds((prev) =>
+        prev.includes(profileToLike.id) ? prev : [...prev, profileToLike.id],
+      );
 
       if (isMatch) {
         Alert.alert("It's a match!", `You and ${profileToLike.name} like each other.`);
@@ -336,6 +343,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const renderSuggestionItem = ({ item }: { item: SuggestionProfile }) => {
+    const alreadyLiked = locallyLikedIds.includes(item.id);
     const anyItem: any = item as any;
     const rawProfilePhotos = anyItem.profile_photos;
     const rawPhotos = anyItem.photos;
@@ -404,7 +412,11 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         )}
         
         {/* Bottom gradient overlay */}
-        <View style={styles.bottomGradient} />
+<LinearGradient
+  colors={['transparent', 'rgba(0, 0, 0, 7)', 'rgba(0, 0, 0, 6)']}
+  locations={[0, 0.4, 1]}
+  style={styles.bottomGradient}
+/>
 
         {/* Profile info floating on image */}
         <View style={styles.profileInfo}>
@@ -433,10 +445,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.roundActionButton, styles.likeButton]}
             onPress={() => handleLike(item)}
-            disabled={liking}
+            disabled={liking || alreadyLiked}
           >
             {liking ? (
               <ActivityIndicator color="#FFF" size="small" />
+            ) : alreadyLiked ? (
+              <Text style={styles.likedLabel}>Liked</Text>
             ) : (
               <LikeIcon />
             )}
@@ -602,7 +616,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     left: 0,
     right: 0,
     height: 300,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+
   },
   profileInfo: {
     position: 'absolute',

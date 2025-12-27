@@ -20,18 +20,25 @@ export const fetchIncomingLikes = async (currentUserId: string): Promise<Incomin
   if (error) throw error;
 
   const rows = (data as any[]) ?? [];
-  return rows.map((row) => {
-    const liker = row.liker;
-    return {
-      like_id: row.id as string,
-      user_id: liker.id as string,
-      name: (liker.name as string) ?? null,
-      age: (liker.age as number) ?? null,
-      city: (liker.city as string) ?? null,
-      country: (liker.country as string) ?? null,
-      profile_photos: (liker.profile_photos as string[] | null) ?? null,
-    };
-  });
+  return rows
+    .map((row) => {
+      const liker = row.liker;
+      if (!liker) {
+        // If the liker profile no longer exists or is null, skip this row.
+        return null;
+      }
+
+      return {
+        like_id: row.id as string,
+        user_id: liker.id as string,
+        name: (liker.name as string) ?? null,
+        age: (liker.age as number) ?? null,
+        city: (liker.city as string) ?? null,
+        country: (liker.country as string) ?? null,
+        profile_photos: (liker.profile_photos as string[] | null) ?? null,
+      } as IncomingLikeProfile;
+    })
+    .filter((item): item is IncomingLikeProfile => item !== null);
 };
 
 export const likeBackAndRemove = async (currentUserId: string, otherUserId: string, likeId: string) => {
