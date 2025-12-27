@@ -1037,7 +1037,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
     try {
       await signUpWithEmailPassword(email.trim().toLowerCase(), password, username.trim());
-      navigation.navigate('Login');
+      // AuthContext will update session, and RootNavigator will route into ProfileWizard.
     } catch {
       // Error already handled by AuthContext via Alert.
     } finally {

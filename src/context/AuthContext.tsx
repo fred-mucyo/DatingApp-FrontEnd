@@ -97,7 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       throw new Error('Username already taken');
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -124,10 +124,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn('Error updating profile username during sign up', profileError.message);
     }
 
-    // Ensure user is not left logged in implicitly; they must sign in explicitly.
-    await supabase.auth.signOut();
+    // If Supabase returned a session, update local auth state so navigation can proceed
+    // to the profile wizard without forcing a separate login step.
+    if (data?.session && data.user) {
+      setSession(data.session);
+      setUser(data.user);
+    }
 
-    Alert.alert('Account created', 'Your account has been created. You can now sign in.');
+    Alert.alert('Account created', 'Your account has been created. Let’s complete your profile.');
   };
 
   const signInWithIdentifierPassword = async (identifier: string, password: string) => {

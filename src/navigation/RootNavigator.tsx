@@ -41,7 +41,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{ title: 'Uni Dating Beta - Login' }}
+            options={{ title: 'MUTIMA - Login' }}
           />
           <Stack.Screen
             name="SignUp"
@@ -67,7 +67,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: 'Uni Dating Beta' }}
+            options={{ title: 'MUTIMA' }}
           />
           <Stack.Screen
             name="Discovery"

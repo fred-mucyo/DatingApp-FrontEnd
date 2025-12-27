@@ -1,376 +1,3 @@
-// import React, { useState } from 'react';
-// import {
-//   View,
-//   Text,
-//   TextInput,
-//   StyleSheet,
-//   KeyboardAvoidingView,
-//   Platform,
-//   TouchableOpacity,
-//   ActivityIndicator,
-//   TouchableWithoutFeedback,
-//   Keyboard,
-// } from 'react-native';
-// import { NativeStackScreenProps } from '@react-navigation/native-stack';
-// import { useAuth } from '../../context/AuthContext';
-// import { RootStackParamList } from '../../navigation/RootNavigator';
-
-// export type LoginScreenProps = NativeStackScreenProps<RootStackParamList, 'Login'>;
-
-// export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
-//   const { signInWithIdentifierPassword, resetPasswordForEmail } = useAuth();
-//   const [identifier, setIdentifier] = useState('');
-//   const [password, setPassword] = useState('');
-//   const [loading, setLoading] = useState(false);
-//   const [info, setInfo] = useState('');
-//   const [showPassword, setShowPassword] = useState(false);
-
-//   const handleSignIn = async () => {
-//     if (!identifier.trim()) {
-//       setInfo('Please enter your email or username.');
-//       return;
-//     }
-//     if (!password) {
-//       setInfo('Please enter your password.');
-//       return;
-//     }
-
-//     setLoading(true);
-//     setInfo('');
-//     try {
-//       await signInWithIdentifierPassword(identifier.trim(), password);
-//     } catch {
-//       // Error already surfaced via Alert in AuthContext
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   const handleForgotPassword = async () => {
-//     if (!identifier.trim() || !identifier.includes('@')) {
-//       setInfo('Please enter the email you registered with to reset your password.');
-//       return;
-//     }
-
-//     setLoading(true);
-//     setInfo('');
-//     try {
-//       await resetPasswordForEmail(identifier.trim().toLowerCase());
-//     } catch {
-//       // Error already surfaced via Alert
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   return (
-//     <KeyboardAvoidingView
-//       style={styles.container}
-//       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-//     >
-//       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-//         <View style={styles.gradientBackground}>
-//           <View style={styles.headerArea}>
-//             <View style={styles.logoCircle}>
-//               <Text style={styles.logoText}>s</Text>
-//             </View>
-//             <Text style={styles.appName}>shuu</Text>
-//             <Text style={styles.tagline}>chat & love</Text>
-//             <View style={styles.betaBadge}>
-//               <Text style={styles.betaText}>BETA</Text>
-//             </View>
-//           </View>
-
-//           <View style={styles.card}>
-//             <Text style={styles.cardTitle}>Welcome back!</Text>
-//             <Text style={styles.cardSubtitle}>Sign in to continue your journey</Text>
-
-//             <View style={styles.fieldGroup}>
-//               <Text style={styles.fieldLabel}>Email or username</Text>
-//               <View style={styles.inputRow}>
-//                 <View style={styles.inputIconPlaceholder} />
-//                 <TextInput
-//                   style={styles.input}
-//                   placeholder="Email or username"
-//                   placeholderTextColor="#9CA3AF"
-//                   autoCapitalize="none"
-//                   autoCorrect={false}
-//                   value={identifier}
-//                   onChangeText={setIdentifier}
-//                   autoFocus
-//                 />
-//                 {identifier.length > 0 && (
-//                   <TouchableOpacity
-//                     onPress={() => setIdentifier('')}
-//                     disabled={loading}
-//                     style={styles.inputTrailing}
-//                   >
-//                     <Text style={styles.inputTrailingText}>Clear</Text>
-//                   </TouchableOpacity>
-//                 )}
-//               </View>
-//             </View>
-
-//             <View style={styles.fieldGroup}>
-//               <Text style={styles.fieldLabel}>Password</Text>
-//               <View style={styles.inputRow}>
-//                 <View style={styles.inputIconPlaceholder} />
-//                 <TextInput
-//                   style={styles.input}
-//                   placeholder="Password"
-//                   placeholderTextColor="#9CA3AF"
-//                   secureTextEntry={!showPassword}
-//                   value={password}
-//                   onChangeText={setPassword}
-//                 />
-//                 <TouchableOpacity
-//                   onPress={() => setShowPassword((prev) => !prev)}
-//                   disabled={loading}
-//                   style={styles.inputTrailing}
-//                 >
-//                   <Text style={styles.inputTrailingText}>{showPassword ? 'Hide' : 'Show'}</Text>
-//                 </TouchableOpacity>
-//               </View>
-//             </View>
-
-//             {!!info && <Text style={styles.info}>{info}</Text>}
-
-//             <TouchableOpacity
-//               onPress={handleForgotPassword}
-//               disabled={loading}
-//               style={styles.forgotRow}
-//             >
-//               <Text style={styles.forgotText}>Forgot password?</Text>
-//             </TouchableOpacity>
-
-//             <TouchableOpacity
-//               onPress={handleSignIn}
-//               disabled={loading}
-//               style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
-//             >
-//               {loading ? (
-//                 <ActivityIndicator color="#FFFFFF" />
-//               ) : (
-//                 <Text style={styles.primaryButtonText}>Sign in</Text>
-//               )}
-//             </TouchableOpacity>
-
-//             <View style={styles.dividerRow}>
-//               <View style={styles.dividerLine} />
-//               <Text style={styles.dividerText}>or</Text>
-//               <View style={styles.dividerLine} />
-//             </View>
-
-//             <View style={styles.footerRow}>
-//               <Text style={styles.footerText}>New to shuu?</Text>
-//               <TouchableOpacity onPress={() => navigation.navigate('SignUp')} disabled={loading}>
-//                 <Text style={styles.footerLinkText}>Create account</Text>
-//               </TouchableOpacity>
-//             </View>
-//           </View>
-
-//           <View style={styles.bottomArea}>
-//             <Text style={styles.bottomText}>Sign in to meet new people on campus.</Text>
-//           </View>
-//         </View>
-//       </TouchableWithoutFeedback>
-//     </KeyboardAvoidingView>
-//   );
-// };
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//   },
-//   gradientBackground: {
-//     flex: 1,
-//     paddingHorizontal: 24,
-//     paddingVertical: 32,
-//     backgroundColor: '#FF6B6B', // fallback base
-//   },
-//   headerArea: {
-//     alignItems: 'center',
-//     marginBottom: 32,
-//   },
-//   logoCircle: {
-//     width: 56,
-//     height: 56,
-//     borderRadius: 28,
-//     backgroundColor: 'rgba(255,255,255,0.15)',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     marginBottom: 12,
-//   },
-//   logoText: {
-//     fontSize: 28,
-//     fontWeight: '700',
-//     color: '#FFFFFF',
-//   },
-//   appName: {
-//     fontSize: 28,
-//     fontWeight: '700',
-//     color: '#FFFFFF',
-//   },
-//   tagline: {
-//     marginTop: 4,
-//     fontSize: 13,
-//     color: 'rgba(255,255,255,0.85)',
-//   },
-//   betaBadge: {
-//     position: 'absolute',
-//     right: 0,
-//     top: 0,
-//     backgroundColor: 'rgba(0,0,0,0.25)',
-//     borderRadius: 999,
-//     paddingHorizontal: 10,
-//     paddingVertical: 4,
-//   },
-//   betaText: {
-//     fontSize: 11,
-//     fontWeight: '600',
-//     color: '#FFFFFF',
-//   },
-//   card: {
-//     backgroundColor: '#FFFFFF',
-//     borderRadius: 16,
-//     padding: 20,
-//     shadowColor: '#000000',
-//     shadowOpacity: 0.06,
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowRadius: 8,
-//     elevation: 2,
-//   },
-//   cardTitle: {
-//     fontSize: 24,
-//     fontWeight: '600',
-//     color: '#1A1A1A',
-//   },
-//   cardSubtitle: {
-//     marginTop: 4,
-//     fontSize: 14,
-//     color: '#666666',
-//     marginBottom: 24,
-//   },
-//   fieldGroup: {
-//     marginBottom: 16,
-//   },
-//   fieldLabel: {
-//     fontSize: 13,
-//     color: '#4B5563',
-//     marginBottom: 4,
-//   },
-//   inputRow: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     borderWidth: 1,
-//     borderColor: '#E5E7EB',
-//     borderRadius: 12,
-//     paddingHorizontal: 12,
-//     height: 48,
-//     backgroundColor: '#FFFFFF',
-//   },
-//   inputIconPlaceholder: {
-//     width: 24,
-//     height: 24,
-//     marginRight: 8,
-//   },
-//   input: {
-//     flex: 1,
-//     fontSize: 15,
-//     color: '#1A1A1A',
-//   },
-//   inputTrailing: {
-//     marginLeft: 8,
-//   },
-//   inputTrailingText: {
-//     fontSize: 13,
-//     color: '#6366F1',
-//   },
-//   info: {
-//     marginTop: 4,
-//     fontSize: 12,
-//     color: '#EF4444',
-//   },
-//   forgotRow: {
-//     alignItems: 'flex-end',
-//     marginTop: 8,
-//     marginBottom: 16,
-//   },
-//   forgotText: {
-//     fontSize: 14,
-//     color: '#6366F1',
-//   },
-//   primaryButton: {
-//     height: 52,
-//     borderRadius: 8,
-//     backgroundColor: '#F97316',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     marginBottom: 24,
-//     shadowColor: '#000000',
-//     shadowOpacity: 0.08,
-//     shadowOffset: { width: 0, height: 2 },
-//     shadowRadius: 4,
-//     elevation: 2,
-//   },
-//   primaryButtonDisabled: {
-//     opacity: 0.7,
-//   },
-//   primaryButtonText: {
-//     fontSize: 16,
-//     fontWeight: '600',
-//     color: '#FFFFFF',
-//   },
-//   dividerRow: {
-//     flexDirection: 'row',
-//     alignItems: 'center',
-//     marginBottom: 24,
-//   },
-//   dividerLine: {
-//     flex: 1,
-//     height: 1,
-//     backgroundColor: '#E5E7EB',
-//   },
-//   dividerText: {
-//     marginHorizontal: 8,
-//     fontSize: 12,
-//     color: '#9CA3AF',
-//   },
-//   footerRow: {
-//     flexDirection: 'row',
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//   },
-//   footerText: {
-//     fontSize: 14,
-//     color: '#6B7280',
-//     marginRight: 4,
-//   },
-//   footerLinkText: {
-//     fontSize: 14,
-//     fontWeight: '600',
-//     color: '#6366F1',
-//   },
-//   bottomArea: {
-//     marginTop: 24,
-//     alignItems: 'center',
-//   },
-//   bottomText: {
-//     fontSize: 12,
-//     color: 'rgba(255,255,255,0.85)',
-//     textAlign: 'center',
-//   },
-// });
-
-
-
-
-
-
-
-
-
-
 import React, { useState } from 'react';
 import {
   View,
@@ -388,6 +15,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { RootStackParamList } from '../../navigation/RootNavigator';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 export type LoginScreenProps = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -437,13 +65,25 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     }
   };
 
+  const ProfileIcon = () => (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={8.5} r={3.5} stroke="#666666" strokeWidth={2} />
+      <Path
+        d="M6 19c.8-2.4 3.1-4 6-4s5.2 1.6 6 4"
+        stroke="#666666"
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <ScrollView 
+        <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -452,9 +92,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             {/* Compact Header */}
             <View style={styles.headerArea}>
               <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>s</Text>
+                <Text style={styles.logoText}></Text>
               </View>
-              <Text style={styles.appName}>shuu</Text>
+              <Text style={styles.appName}>Mutima</Text>
               <View style={styles.betaBadge}>
                 <Text style={styles.betaText}>BETA</Text>
               </View>
@@ -468,7 +108,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               {/* Email/Username Field */}
               <View style={styles.fieldGroup}>
                 <View style={styles.inputRow}>
-                  <Text style={styles.inputIcon}>👤</Text>
+                  <View style={styles.iconWrapper}>
+                    <ProfileIcon />
+                  </View>
+
                   <TextInput
                     style={styles.input}
                     placeholder="Email or username"
@@ -555,7 +198,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             </View>
 
             {/* Bottom Tagline */}
-            <Text style={styles.bottomText}>Find your campus connection</Text>
+            <Text style={styles.bottomText}>Let's connect and chill 🔥</Text>
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
@@ -580,25 +223,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
+  // logoCircle: {
+  //   width: 64,
+  //   height: 64,
+  //   borderRadius: 32,
+  //   backgroundColor: 'rgba(255,255,255,0.2)',
+  //   justifyContent: 'center',
+  //   alignItems: 'center',
+  //   marginBottom: 8,
+  // },
   logoText: {
     fontSize: 32,
     fontWeight: '700',
     color: '#FFFFFF',
   },
   appName: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 30,
+    fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 1,
+    letterSpacing: -0.5,
+    fontFamily: 'Montserrat_900Black',
+    textTransform: 'none',
+    shadowColor: 'rgba(255, 107, 107, 1)',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 12,
   },
   betaBadge: {
     position: 'absolute',
@@ -650,6 +300,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     height: 50,
     backgroundColor: '#FAFAFA',
+  },
+  iconWrapper: {
+    marginRight: 10,
   },
   inputIcon: {
     fontSize: 20,
@@ -751,6 +404,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
-    fontWeight: '500',
+   fontWeight: 'bold',
+
   },
 });
