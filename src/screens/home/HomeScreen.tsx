@@ -14,6 +14,8 @@ import {
   Share,
   Dimensions,
   Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
@@ -22,6 +24,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { getDailySuggestions, SuggestionProfile, sendLike, markProfilePassed } from '../../services/matching';
+import { verifyMatchExists, hasSentPreMatchMessage, sendPreMatchMessage } from '../../services/chat';
 import { supabase } from '../../config/supabaseClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -40,6 +43,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [liking, setLiking] = useState(false);
   const [likesToday, setLikesToday] = useState<{ date: string; count: number } | null>(null);
   const [locallyLikedIds, setLocallyLikedIds] = useState<string[]>([]);
+  const [preMatchTarget, setPreMatchTarget] = useState<SuggestionProfile | null>(null);
+  const [preMatchMessage, setPreMatchMessage] = useState('');
+  const [preMatchSending, setPreMatchSending] = useState(false);
 
   const greetingName = profile?.name || user?.email || 'there';
 
@@ -222,8 +228,67 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleMessage = (profileId: string) => {
-    Alert.alert('Send Message', 'This will open chat with this user.');
+  const handleMessage = async (profileId: string) => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to send messages.');
+      return;
+    }
+
+    try {
+      const match = await verifyMatchExists(user.id, profileId);
+      if (!match) {
+        const alreadySent = await hasSentPreMatchMessage(user.id, profileId);
+        if (alreadySent) {
+          Alert.alert(
+            'Message sent',
+            'You already sent a message to this person. You can chat freely once you match.',
+          );
+          return;
+        }
+
+        const target = suggestions.find((p) => p.id === profileId) ?? null;
+        if (!target) {
+          Alert.alert('Error', 'Could not open message composer for this profile.');
+          return;
+        }
+
+        setPreMatchTarget(target);
+        setPreMatchMessage('');
+        return;
+      }
+
+      navigation.navigate('Chat', {
+        matchId: match.id,
+        otherUserId: match.other_user_id,
+        otherUserName: match.other_user_name,
+        otherUserPhoto: match.other_user_photo ?? undefined,
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to open chat');
+    }
+  };
+
+  const handleSendPreMatch = async () => {
+    if (!user || !preMatchTarget) return;
+    if (!preMatchMessage.trim()) {
+      Alert.alert('Message required', 'Please write a short message first.');
+      return;
+    }
+
+    setPreMatchSending(true);
+    try {
+      await sendPreMatchMessage(user.id, preMatchTarget.id, preMatchMessage);
+      Alert.alert(
+        'Message sent',
+        `Your message was sent to ${preMatchTarget.name}. You can continue the conversation once you both match.`,
+      );
+      setPreMatchTarget(null);
+      setPreMatchMessage('');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to send message');
+    } finally {
+      setPreMatchSending(false);
+    }
   };
 
   const PassIcon = () => (
@@ -552,6 +617,59 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Pre-match message composer modal */}
+        <Modal
+          transparent
+          animationType="slide"
+          visible={!!preMatchTarget}
+          onRequestClose={() => {
+            if (!preMatchSending) {
+              setPreMatchTarget(null);
+              setPreMatchMessage('');
+            }
+          }}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>
+                Message {preMatchTarget?.name ?? 'this person'}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                You can send one message before you match. Make it count.
+              </Text>
+              <TextInput
+                style={styles.modalInput}
+                multiline
+                placeholder="Say hi..."
+                placeholderTextColor="#9CA3AF"
+                value={preMatchMessage}
+                onChangeText={(text) => {
+                  if (text.length <= 500) setPreMatchMessage(text);
+                }}
+              />
+              <View style={styles.modalActionsRow}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalCancelButton]}
+                  onPress={() => {
+                    if (preMatchSending) return;
+                    setPreMatchTarget(null);
+                    setPreMatchMessage('');
+                  }}
+                >
+                  <Text style={styles.modalCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalSendButton]}
+                  onPress={handleSendPreMatch}
+                  disabled={preMatchSending}
+                >
+                  <Text style={styles.modalSendText}>{preMatchSending ? 'Sending…' : 'Send'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -808,7 +926,66 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     color: '#F97316',
     fontWeight: '700',
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCard: {
+    width: '100%',
+    backgroundColor: '#111827',
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginBottom: 12,
+  },
+  modalInput: {
+    minHeight: 80,
+    maxHeight: 160,
+    borderRadius: 12,
+    backgroundColor: '#1F2937',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    fontSize: 14,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
+  },
+  modalCancelButton: {
+    backgroundColor: '#374151',
+  },
+  modalSendButton: {
+    backgroundColor: '#F97316',
+  },
+  modalCancelText: {
+    color: '#E5E7EB',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  modalSendText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
-
-
-

@@ -24,6 +24,14 @@ export interface ChatMessage {
   created_at: string;
 }
 
+export interface PreMatchMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  content: string;
+  created_at: string;
+}
+
 export const DAILY_MESSAGE_LIMIT = 50;
 
 const todayKey = () => new Date().toISOString().substring(0, 10); // YYYY-MM-DD
@@ -165,6 +173,74 @@ export const fetchMessages = async (
 
   if (error) throw error;
   return (data as ChatMessage[]) ?? [];
+};
+
+// --- Pre-match messaging helpers ---
+
+/**
+ * Check whether the current user has already sent a pre-match message
+ * to the given receiver. This relies on a `pre_match_messages` table
+ * in Supabase with at least sender_id, receiver_id, content, created_at.
+ */
+export const hasSentPreMatchMessage = async (
+  senderId: string,
+  receiverId: string,
+): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('pre_match_messages')
+    .select('id')
+    .eq('sender_id', senderId)
+    .eq('receiver_id', receiverId)
+    .limit(1)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw error;
+  }
+
+  return !!data;
+};
+
+/**
+ * Send a single pre-match message from sender to receiver.
+ * Enforces one-message-per-sender/receiver pair in app logic.
+ */
+export const sendPreMatchMessage = async (
+  senderId: string,
+  receiverId: string,
+  content: string,
+): Promise<PreMatchMessage> => {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    throw new Error('Message cannot be empty.');
+  }
+
+  // Basic length guard to avoid abuse
+  if (trimmed.length > 500) {
+    throw new Error('Message is too long. Please keep it under 500 characters.');
+  }
+
+  // Enforce one pre-match message per sender/receiver in app logic
+  const alreadySent = await hasSentPreMatchMessage(senderId, receiverId);
+  if (alreadySent) {
+    throw new Error('You have already sent a message to this person.');
+  }
+
+  const { data, error } = await supabase
+    .from('pre_match_messages')
+    .insert({
+      sender_id: senderId,
+      receiver_id: receiverId,
+      content: trimmed,
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as PreMatchMessage;
 };
 
 export const fetchMessagesLastMinute = async (
