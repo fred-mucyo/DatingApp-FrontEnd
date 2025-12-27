@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -30,9 +31,19 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export const RootNavigator = () => {
-  const { session, profile, profileLoading } = useAuth();
+  const { session, profile, profileLoading, loading } = useAuth();
 
-  const needsProfile = !!session && (!profile || !profile.is_complete);
+  const needsProfile = !!session && !profileLoading && (!profile || !profile.is_complete);
+
+  // While we are still determining the auth session or loading the profile,
+  // avoid rendering either the ProfileWizard or Home to prevent flicker.
+  if (loading || profileLoading) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color="#F97316" />
+      </View>
+    );
+  }
 
   return (
     <Stack.Navigator>
@@ -67,7 +78,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: 'MUTIMA' }}
+            options={{ title: '🥰MUTIMA' }}
           />
           <Stack.Screen
             name="Discovery"
