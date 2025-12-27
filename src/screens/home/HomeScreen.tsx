@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
@@ -16,6 +16,10 @@ import {
   Platform,
   Modal,
   TextInput,
+  Animated,
+  Easing,
+  AppState,
+  AppStateStatus,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 
@@ -24,7 +28,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { getDailySuggestions, SuggestionProfile, sendLike, markProfilePassed } from '../../services/matching';
-import { verifyMatchExists, hasSentPreMatchMessage, sendPreMatchMessage } from '../../services/chat';
+import { verifyMatchExists, hasSentPreMatchMessage, sendPreMatchMessage, fetchMatchesWithLastMessage } from '../../services/chat';
+import { fetchIncomingLikes } from '../../services/likes';
 import { supabase } from '../../config/supabaseClient';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
@@ -36,6 +41,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const LIKE_LIMIT_KEY = 'matching.likes_today';
   const LIKE_LIMIT = 50;
+  const LAST_READ_KEY_PREFIX = 'last_read_';
 
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [suggestions, setSuggestions] = useState<SuggestionProfile[]>([]);
@@ -46,6 +52,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [preMatchTarget, setPreMatchTarget] = useState<SuggestionProfile | null>(null);
   const [preMatchMessage, setPreMatchMessage] = useState('');
   const [preMatchSending, setPreMatchSending] = useState(false);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [newLikesCount, setNewLikesCount] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
 
   const greetingName = profile?.name || user?.email || 'there';
 
@@ -168,6 +177,92 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     loadSuggestions();
   }, [loadLikesToday, loadSuggestions]);
 
+  // ---- Badge counts for bottom navigation ----
+
+  const loadUnreadMessagesCount = useCallback(async () => {
+    if (!user) {
+      setUnreadMessagesCount(0);
+      return;
+    }
+    try {
+      const matches = await fetchMatchesWithLastMessage(user.id);
+      let unread = 0;
+      for (const m of matches) {
+        const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
+        const lastRead = await AsyncStorage.getItem(lastKey);
+        const lastMessageTime = m.last_message_created_at ?? m.created_at;
+        if (lastMessageTime) {
+          if (!lastRead || new Date(lastRead) < new Date(lastMessageTime)) {
+            unread += 1;
+          }
+        }
+      }
+      setUnreadMessagesCount(unread);
+    } catch {
+      // Soft-fail: don't block UI if badge count fails
+    }
+  }, [LAST_READ_KEY_PREFIX, user]);
+
+  const loadNewLikesCount = useCallback(async () => {
+    if (!user) {
+      setNewLikesCount(0);
+      return;
+    }
+    try {
+      const incoming = await fetchIncomingLikes(user.id);
+      setNewLikesCount(incoming.length);
+    } catch {
+      // Soft-fail
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    loadUnreadMessagesCount();
+    loadNewLikesCount();
+  }, [user?.id, loadUnreadMessagesCount, loadNewLikesCount]);
+
+  // Auto-refresh badge counts every 30 seconds
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      loadUnreadMessagesCount();
+      loadNewLikesCount();
+    }, 30000);
+
+    return () => clearInterval(id);
+  }, [user?.id, loadUnreadMessagesCount, loadNewLikesCount]);
+
+  // Refresh when app returns to foreground
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active' && user) {
+        loadUnreadMessagesCount();
+        loadNewLikesCount();
+      }
+    };
+
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => {
+      sub.remove();
+    };
+  }, [user, loadUnreadMessagesCount, loadNewLikesCount]);
+
+  const handlePullToRefresh = useCallback(async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        loadSuggestions(),
+        loadLikesToday(),
+        loadUnreadMessagesCount(),
+        loadNewLikesCount(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshing, loadSuggestions, loadLikesToday, loadUnreadMessagesCount, loadNewLikesCount]);
+
   const visibleSuggestions = suggestions.slice(suggestionIndex, suggestionIndex + 5);
 
   const handlePass = async (profileToPass?: SuggestionProfile) => {
@@ -289,6 +384,97 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     } finally {
       setPreMatchSending(false);
     }
+  };
+
+  const Badge: React.FC<{ count: number; color: string; accessibilityLabel: string }> = ({
+    count,
+    color,
+    accessibilityLabel,
+  }) => {
+    const display = count > 9 ? '9+' : String(count);
+    const scale = useRef(new Animated.Value(1)).current;
+    const opacity = useRef(new Animated.Value(0)).current;
+    const glow = useRef(new Animated.Value(0)).current;
+    const prevCountRef = useRef<number>(0);
+
+    useEffect(() => {
+      const prev = prevCountRef.current;
+      prevCountRef.current = count;
+
+      if (count > 0) {
+        const isIncrease = count > prev;
+
+        Animated.parallel([
+          Animated.timing(opacity, {
+            toValue: 1,
+            duration: 200,
+            useNativeDriver: false,
+          }),
+          Animated.sequence([
+            Animated.timing(scale, {
+              toValue: isIncrease ? 1.3 : 1.15,
+              duration: 140,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: false,
+            }),
+            Animated.timing(scale, {
+              toValue: 1,
+              duration: 90,
+              easing: Easing.in(Easing.ease),
+              useNativeDriver: false,
+            }),
+          ]),
+          Animated.sequence([
+            Animated.timing(glow, {
+              toValue: 1,
+              duration: 150,
+              useNativeDriver: false,
+            }),
+            Animated.timing(glow, {
+              toValue: 0,
+              duration: 250,
+              useNativeDriver: false,
+            }),
+          ]),
+        ]).start();
+      } else {
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: false,
+        }).start();
+      }
+    }, [count, opacity, scale, glow]);
+
+    if (count <= 0) return null;
+
+    return (
+      <Animated.View
+        accessible
+        accessibilityLabel={accessibilityLabel}
+        style={[
+          styles.badge,
+          {
+            backgroundColor: color,
+            opacity,
+            shadowOpacity: glow.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.3, 0.7],
+            }),
+            transform: [
+              {
+                scale: scale.interpolate({
+                  inputRange: [0.8, 1.2],
+                  outputRange: [0.8, 1.2],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Text style={styles.badgeText}>{display}</Text>
+      </Animated.View>
+    );
   };
 
   const PassIcon = () => (
@@ -575,6 +761,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             style={styles.carousel}
+            refreshing={refreshing}
+            onRefresh={handlePullToRefresh}
           />
         )}
 
@@ -595,16 +783,38 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.navLabel}>Explore</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Likes')}>
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => {
+                setNewLikesCount(0);
+                navigation.navigate('Likes');
+              }}
+            >
               <View style={styles.navIconCircle}>
                 <LikesNavIcon />
+                <Badge
+                  count={newLikesCount}
+                  color="#EC4899"
+                  accessibilityLabel={`${newLikesCount} new likes`}
+                />
               </View>
               <Text style={styles.navLabel}>Likes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Matches')}>
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => {
+                setUnreadMessagesCount(0);
+                navigation.navigate('Matches');
+              }}
+            >
               <View style={styles.navIconCircle}>
                 <MessagesNavIcon />
+                <Badge
+                  count={unreadMessagesCount}
+                  color="#EF4444"
+                  accessibilityLabel={`${unreadMessagesCount} unread messages`}
+                />
               </View>
               <Text style={styles.navLabel}>Chat</Text>
             </TouchableOpacity>
@@ -925,6 +1135,29 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   navLabelActive: {
     color: '#F97316',
     fontWeight: '700',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+    paddingHorizontal: 2,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
   },
   modalBackdrop: {
     flex: 1,
