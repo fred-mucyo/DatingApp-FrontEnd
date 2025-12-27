@@ -12,8 +12,9 @@ import {
   ScrollView,
   Share,
   Dimensions,
+  Platform,
 } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -143,6 +144,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       );
 
       setSuggestions(enriched);
+      console.log('HOME suggestions length after enrich:', enriched.length);
       setSuggestionIndex(0);
     } catch (e: any) {
       console.log('HOME getDailySuggestions error:', e);
@@ -218,18 +220,18 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const PassIcon = () => (
-    <Svg width={42} height={42} viewBox="0 0 24 24" fill="none">
+    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
       <Path
         d="M6 6l12 12M18 6L6 18"
-        stroke="#F87171"
-        strokeWidth={2.4}
+        stroke="#EF4444"
+        strokeWidth={2.5}
         strokeLinecap="round"
       />
     </Svg>
   );
 
   const LikeIcon = () => (
-    <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+    <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
         fill="#22C55E"
@@ -238,97 +240,98 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const MessageIcon = () => (
-    <Svg width={42} height={42} viewBox="0 0 24 24" fill="none">
+    <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M4 5l16 7-16 7 3-7-3-7z"
-        fill="#38BDF8"
-        transform="rotate(-40 12 12)"
+        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+        stroke="#6366F1"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </Svg>
   );
 
   const HomeNavIcon = () => (
-    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M7 5.5C7.8 4 9.2 3 11 3c1.9 0 3.2 1.2 3.8 2.4.6 1.2.7 2.5.5 3.6-.3 1.5-1.1 2.8-2.2 3.9-.6.6-.9 1.4-.9 2.2V19a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.3C8 15.1 7.4 13.7 6.6 12.5 5.6 11 5 9.7 5 8.3c0-1.1.4-2.1 1-2.8Z"
+        d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
         fill="#F97316"
+        stroke="#F97316"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
-      <Path
-        d="M11.5 9.5C12.2 8.3 13.2 7.5 14.5 7.5c1.3 0 2.3.8 2.7 1.8.4 1 .3 2-.1 2.9-.5 1.1-1.4 2.1-2.4 3-.3.3-.7.7-.7 1.3V18a.8.8 0 0 1-.8.8h-1a.8.8 0 0 1-.8-.8v-1.5c0-1-.3-1.9-.7-2.7-.4-.8-.7-1.6-.7-2.4 0-.8.3-1.6.8-1.9Z"
-        fill="#FACC15"
-      />
+      <Path d="M9 22V12h6v10" stroke="#FFFFFF" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 
   const LikesNavIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
-        fill="#FFFFFF"
+        fill="#666666"
       />
     </Svg>
   );
 
   const ExploreNavIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z"
-        stroke="#FFFFFF"
-        strokeWidth={1.6}
-      />
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={9} stroke="#666666" strokeWidth={2} />
       <Path
         d="M10 14l1.2-3.8L15 9l-1.2 3.8L10 14Z"
-        fill="#FFFFFF"
+        fill="#666666"
       />
     </Svg>
   );
 
   const ProfileNavIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 12a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-        stroke="#FFFFFF"
-        strokeWidth={1.8}
-      />
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={8.5} r={3.5} stroke="#666666" strokeWidth={2} />
       <Path
         d="M6 19c.8-2.4 3.1-4 6-4s5.2 1.6 6 4"
-        stroke="#FFFFFF"
-        strokeWidth={1.8}
+        stroke="#666666"
+        strokeWidth={2}
         strokeLinecap="round"
       />
     </Svg>
   );
 
   const MessagesNavIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M5 6h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-6.5L8 20v-4H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z"
-        stroke="#FFFFFF"
-        strokeWidth={1.6}
+        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+        stroke="#666666"
+        strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
-      />
-      <Path
-        d="M9 11h6"
-        stroke="#FFFFFF"
-        strokeWidth={1.6}
-        strokeLinecap="round"
       />
     </Svg>
   );
 
   const LocationIcon = () => (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12 3a6 6 0 0 0-6 6c0 4.2 4.5 8.7 5.6 9.8a.6.6 0 0 0 .8 0C13.5 17.7 18 13.2 18 9a6 6 0 0 0-6-6Z"
-        stroke="#FFFFFF"
-        strokeWidth={1.8}
+        fill="#FFFFFF"
+        opacity={0.9}
       />
-      <Path
-        d="M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z"
-        stroke="#FFFFFF"
-        strokeWidth={1.8}
-      />
+      <Circle cx={12} cy={9} r={2} fill="#1A1A1A" />
+    </Svg>
+  );
+
+  const ShareIcon = () => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx={18} cy={5} r={3} stroke="#FFFFFF" strokeWidth={2} />
+      <Circle cx={6} cy={12} r={3} stroke="#FFFFFF" strokeWidth={2} />
+      <Circle cx={18} cy={19} r={3} stroke="#FFFFFF" strokeWidth={2} />
+      <Path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="#FFFFFF" strokeWidth={2} />
+    </Svg>
+  );
+
+  const InfoIcon = () => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={9} stroke="#FFFFFF" strokeWidth={2} />
+      <Path d="M12 16v-4M12 8h.01" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
     </Svg>
   );
 
@@ -371,15 +374,16 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <View style={styles.cardContainer}>
         {photos.length > 0 ? (
-          // Local, lightweight photo swiping per profile.
-          <FlatList
-            data={photos}
-            keyExtractor={(uri) => uri}
+          // Local, lightweight photo swiping per profile using a ScrollView pager.
+          <ScrollView
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
-            renderItem={({ item: uri }) => (
+            style={styles.photoPager}
+          >
+            {photos.map((uri) => (
               <Image
+                key={uri}
                 source={{ uri }}
                 style={styles.fullScreenImage}
                 onError={(e) => {
@@ -391,8 +395,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                   });
                 }}
               />
-            )}
-          />
+            ))}
+          </ScrollView>
         ) : (
           <View style={[styles.fullScreenImage, styles.placeholderImage]}>
             <Text style={styles.placeholderText}>No Photo</Text>
@@ -405,7 +409,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Profile info floating on image */}
         <View style={styles.profileInfo}>
           <Text style={styles.profileName}>
-            {item.name} <Text style={styles.profileAge}>{item.age}</Text>
+            {item.name}{' '}
+            <Text style={styles.profileAge}>{item.age}</Text>
           </Text>
           <View style={styles.locationRow}>
             <LocationIcon />
@@ -445,9 +450,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Info button (top right) */}
+        {/* Info button (top left) */}
         <TouchableOpacity style={styles.infoButton}>
-          <Text style={styles.infoButtonIcon}>ⓘ</Text>
+          <InfoIcon />
         </TouchableOpacity>
       </View>
     );
@@ -459,23 +464,21 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Top Bar */}
         <View style={styles.topBar}>
           <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <View style={styles.shareIconCircle}>
-              <Text style={styles.shareIcon}>➤</Text>
-            </View>
+            <ShareIcon />
           </TouchableOpacity>
         </View>
 
         {loadingSuggestions ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#FF6B6B" />
-            <Text style={styles.loadingText}>Finding matches for you...</Text>
+            <ActivityIndicator size="large" color="#F97316" />
+            <Text style={styles.loadingText}>Finding your perfect match...</Text>
           </View>
         ) : suggestions.length === 0 ? (
           <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyIcon}>😊</Text>
-            <Text style={styles.emptyTitle}>You've seen everyone for today!</Text>
+            <Text style={styles.emptyIcon}>💫</Text>
+            <Text style={styles.emptyTitle}>You're All Caught Up!</Text>
             <Text style={styles.emptySubtitle}>
-              Come back tomorrow for fresh matches
+              Check back tomorrow for fresh connections
             </Text>
             <TouchableOpacity
               style={styles.exploreButton}
@@ -500,7 +503,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.bottomNavContainer}>
           <View style={styles.bottomNav}>
             <TouchableOpacity style={styles.navItem} onPress={() => navigation.navigate('Home')}>
-              <View style={[styles.navIconCircle, styles.navIconActive]}>
+              <View style={styles.navIconCircle}>
                 <HomeNavIcon />
               </View>
               <Text style={[styles.navLabel, styles.navLabelActive]}>Home</Text>
@@ -540,7 +543,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#1A1A1A',
@@ -551,25 +554,19 @@ const styles = StyleSheet.create({
   },
   topBar: {
     position: 'absolute',
-    top: 50,
+    top: Platform.OS === 'ios' ? 50 : 20,
     right: 20,
     zIndex: 10,
   },
   shareButton: {
-    padding: 0,
-  },
-  shareIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  shareIcon: {
-    fontSize: 20,
-    color: '#FFFFFF',
-    transform: [{ rotate: '-45deg' }],
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   carousel: {
     flex: 1,
@@ -580,9 +577,13 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   fullScreenImage: {
-    width: '100%',
-    height: '100%',
+    width: width,
+    height: height - 100,
     resizeMode: 'cover',
+  },
+  photoPager: {
+    width: width,
+    height: height - 100,
   },
   placeholderImage: {
     backgroundColor: '#2A2A2A',
@@ -590,105 +591,121 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   placeholderText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#666666',
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   bottomGradient: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 280,
-    backgroundColor: 'transparent',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.3) 50%, transparent 100%)',
+    height: 300,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   profileInfo: {
     position: 'absolute',
-    bottom: 160,
-    left: 20,
-    right: 20,
+    bottom: 170,
+    left: 24,
+    right: 24,
   },
   profileName: {
-    fontSize: 34,
+    fontSize: 32,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 4,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    marginBottom: 6,
+    letterSpacing: -0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    textShadowRadius: 6,
   },
   profileAge: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: '400',
+    letterSpacing: -0.3,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   profileLocation: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '500',
+    letterSpacing: 0.2,
+    opacity: 0.95,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    textShadowRadius: 4,
   },
   actionButtonsRow: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 90,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 20,
+    gap: 20,
+    paddingHorizontal: 24,
   },
   roundActionButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 5,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 6,
+    backgroundColor: '#FFFFFF',
   },
   passButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   likeButton: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
   },
   messageButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   infoButton: {
     position: 'absolute',
-    top: 50,
+    top: Platform.OS === 'ios' ? 50 : 20,
     left: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  infoButtonIcon: {
-    fontSize: 20,
-    color: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#1A1A1A',
+    gap: 16,
   },
   loadingText: {
-    marginTop: 12,
     fontSize: 16,
     color: '#FFFFFF',
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
   emptyStateContainer: {
     flex: 1,
@@ -696,95 +713,88 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 40,
     backgroundColor: '#1A1A1A',
+    gap: 8,
   },
   emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 72,
+    marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 22,
+    fontSize: 26,
     fontWeight: '700',
     color: '#FFFFFF',
-    marginBottom: 8,
+    marginBottom: 6,
     textAlign: 'center',
+    letterSpacing: -0.5,
   },
   emptySubtitle: {
-    fontSize: 15,
-    color: '#999999',
-    marginBottom: 24,
+    fontSize: 16,
+    color: '#9CA3AF',
+    marginBottom: 28,
     textAlign: 'center',
+    letterSpacing: 0.2,
+    fontWeight: '400',
   },
   exploreButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 25,
-    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 36,
+    paddingVertical: 16,
+    borderRadius: 28,
+    backgroundColor: '#F97316',
+    shadowColor: '#F97316',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    elevation: 6,
   },
   exploreButtonText: {
     fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '700',
+    letterSpacing: 0.3,
   },
   bottomNavContainer: {
     position: 'absolute',
     bottom: 20,
-    left: 20,
-    right: 20,
+    left: 16,
+    right: 16,
   },
   bottomNav: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(30, 30, 30, 0.95)',
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    borderRadius: 32,
-    borderWidth: 0.5,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 30,
     shadowColor: '#000000',
-    shadowOpacity: 0.3,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 16,
+    elevation: 10,
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 3,
+    paddingVertical: 6,
   },
   navIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
-    position: 'relative',
-  },
-  navIconActive: {
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
-  },
-  navIconText: {
-    fontSize: 18,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    zIndex: 1,
-  },
-  badgeText: {
-    fontSize: 11,
-    color: '#1A1A1A',
-    fontWeight: '700',
   },
   navLabel: {
-    fontSize: 10,
-    color: '#999999',
-    fontWeight: '500',
+    fontSize: 11,
+    color: '#666666',
+    fontWeight: '600',
     marginTop: 2,
+    letterSpacing: 0.2,
   },
   navLabelActive: {
-    color: '#FF6B6B',
+    color: '#F97316',
     fontWeight: '700',
   },
 });
+
+
+
