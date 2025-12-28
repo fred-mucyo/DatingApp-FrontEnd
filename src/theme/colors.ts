@@ -1,7 +1,7 @@
 export const colors = {
   // Brand / primary
   primaryBackground: '#FF6B6B', // hero background (e.g. login header)
-  primary: '#F97316', // main CTA buttons
+  primary: '#F97316', // main CTA buttonss
 
   // Secondary accent
   secondary: '#6366F1', // links, secondary actions
