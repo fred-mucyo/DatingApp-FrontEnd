@@ -24,14 +24,15 @@
       },
       "package": "com.university.unidatingbeta"
     },
-    "extra": {
-      "eas": {
-        "projectId": "CHANGE-ME-IN-EAS-IF-USED"
-      }
-    },
     "plugins": [
       "expo-font",
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b3d5b38f-d933-474c-8b16-1e48c7677ff7"
+      }
+    },
+    "owner": "mucyo_fred"
   }
 }

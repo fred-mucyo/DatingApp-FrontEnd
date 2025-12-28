@@ -91,9 +91,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <View style={styles.gradientBackground}>
             {/* Compact Header */}
             <View style={styles.headerArea}>
-              <View style={styles.logoCircle}>
-                <Text style={styles.logoText}></Text>
-              </View>
               <Text style={styles.appName}>Mutima</Text>
               <View style={styles.betaBadge}>
                 <Text style={styles.betaText}>BETA</Text>
