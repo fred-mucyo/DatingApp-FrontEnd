@@ -19,7 +19,10 @@
     },
     "production": {
       "autoIncrement": true,
-      "node": "20.19.4"
+      "node": "20.19.4",
+       "env": {
+        "KOTLIN_VERSION": "1.9.25"
+      }
     }
   },
   "submit": {
