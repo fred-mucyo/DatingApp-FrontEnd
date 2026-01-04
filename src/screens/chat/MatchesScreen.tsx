@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,11 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { fetchMatchesWithLastMessage, MatchItem } from '../../services/chat';
+import { cacheService } from '../../services/cache';
 
 const LAST_READ_KEY_PREFIX = 'last_read_';
 
@@ -42,37 +44,110 @@ const formatTimeLabel = (isoString: string | null): string => {
 
 export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  useEffect(() => {
-    const run = async () => {
-      if (!user) return;
+  const loadMatches = useCallback(async (showLoading = false) => {
+    if (!user) return;
+    
+    if (showLoading) {
       setLoading(true);
-      try {
-        const data = await fetchMatchesWithLastMessage(user.id);
-        setMatches(data);
+    } else {
+      setRefreshing(true);
+    }
 
-        // Approximate unread state using last_read timestamps in AsyncStorage
+    try {
+      // Try to load from cache first
+      const cachedMatches = await cacheService.getMatches(user.id);
+      if (cachedMatches && cachedMatches.length > 0) {
+        setMatches(cachedMatches);
+        setHasLoadedOnce(true);
+        // Calculate unread counts from cached data
         const counts: Record<string, number> = {};
-        for (const m of data) {
-          const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
-          const lastRead = await AsyncStorage.getItem(lastKey);
-          const lastMessageTime = m.last_message_created_at;
-          if (lastMessageTime) {
-            if (!lastRead || new Date(lastRead) < new Date(lastMessageTime)) {
+        for (const m of cachedMatches) {
+          const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
+          if (lastMessageFromOther && m.last_message_created_at) {
+            const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
+            const lastRead = await AsyncStorage.getItem(lastKey);
+            if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
               counts[m.id] = 1;
             }
           }
         }
         setUnreadCounts(counts);
-      } finally {
-        setLoading(false);
       }
-    };
-    run();
+
+      // Fetch fresh data in background
+      const data = await fetchMatchesWithLastMessage(user.id);
+      setMatches(data);
+      await cacheService.setMatches(user.id, data);
+
+      // Calculate unread counts
+      const counts: Record<string, number> = {};
+      for (const m of data) {
+        const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
+        if (lastMessageFromOther && m.last_message_created_at) {
+          const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
+          const lastRead = await AsyncStorage.getItem(lastKey);
+          if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
+            counts[m.id] = 1;
+          }
+        }
+      }
+      setUnreadCounts(counts);
+      setHasLoadedOnce(true);
+    } catch (error) {
+      console.warn('Failed to load matches:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [user]);
+
+  // Load cached data immediately on mount
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadCached = async () => {
+      const cached = await cacheService.getMatches(user.id);
+      if (cached && cached.length > 0) {
+        setMatches(cached);
+        setHasLoadedOnce(true);
+        // Calculate unread counts
+        const counts: Record<string, number> = {};
+        for (const m of cached) {
+          const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
+          if (lastMessageFromOther && m.last_message_created_at) {
+            const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
+            const lastRead = await AsyncStorage.getItem(lastKey);
+            if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
+              counts[m.id] = 1;
+            }
+          }
+        }
+        setUnreadCounts(counts);
+      } else {
+        // If no cache, show loading
+        setLoading(true);
+      }
+      // Then refresh in background
+      loadMatches(false);
+    };
+    
+    loadCached();
+  }, [user, loadMatches]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        loadMatches(false); // Refresh in background without showing loading
+      }
+    }, [user, loadMatches])
+  );
 
   const handleOpenChat = async (m: MatchItem) => {
     if (!user) return;
@@ -83,6 +158,35 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
       otherUserName: m.other_user_name,
       otherUserPhoto: m.other_user_photo ?? undefined,
     });
+  };
+
+  // WhatsApp-style tick component for conversation list
+  const MessageTicks = ({ item }: { item: MatchItem }) => {
+    // Only show ticks if last message was sent by current user
+    const isMyMessage = item.last_message_sender_id === user?.id;
+    if (!isMyMessage || !item.last_message_content) return null;
+
+    const isRead = !!item.last_message_read_at;
+    const isDelivered = !!item.last_message_delivered_at;
+
+    // 1 tick = sent, 2 ticks = delivered, 2 orange ticks = read
+    const tickColor = isRead ? '#F97316' : '#9CA3AF'; // Primary color if read, gray if not
+    const tickCount = isDelivered ? 2 : 1;
+
+    return (
+      <View style={styles.messageTicksContainer}>
+        {tickCount === 1 ? (
+          <Text style={[styles.messageTick, { color: tickColor }]}>✓</Text>
+        ) : (
+          <>
+            <Text style={[styles.messageTick, { color: tickColor }]}>✓</Text>
+            <Text style={[styles.messageTick, styles.messageTickSecond, { color: tickColor }]}>
+              ✓
+            </Text>
+          </>
+        )}
+      </View>
+    );
   };
 
   const renderItem = ({ item }: { item: MatchItem }) => {
@@ -113,12 +217,15 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
           </View>
 
           <View style={styles.cardBottomRow}>
-            <Text
-              style={[styles.preview, unread > 0 && styles.previewUnread]}
-              numberOfLines={2}
-            >
-              {lastMessagePreview}
-            </Text>
+            <View style={styles.previewContainer}>
+              <Text
+                style={[styles.preview, unread > 0 && styles.previewUnread]}
+                numberOfLines={2}
+              >
+                {lastMessagePreview}
+              </Text>
+              <MessageTicks item={item} />
+            </View>
             <View style={styles.trailingIndicators}>
               {unread > 0 && <View style={styles.unreadDot} />}
               <Text style={styles.chevron}>{'>'}</Text>
@@ -144,9 +251,7 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
             <Text style={styles.headerIcon}>←</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Messages</Text>
-          <TouchableOpacity style={styles.headerButton} activeOpacity={0.8}>
-            <Text style={styles.headerIcon}>⚙️</Text>
-          </TouchableOpacity>
+          <View style={styles.headerSpacer} />
         </View>
 
         <View style={styles.statsBar}>
@@ -157,11 +262,11 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         </View>
 
         <View style={styles.contentArea}>
-          {loading ? (
+          {loading && !hasLoadedOnce ? (
             <View style={styles.center}>
-              <ActivityIndicator />
+              <ActivityIndicator size="large" color="#F97316" />
             </View>
-          ) : totalMatches === 0 ? (
+          ) : totalMatches === 0 && hasLoadedOnce && !refreshing ? (
             <View style={styles.emptyStateWrapper}>
               <View style={styles.emptyIllustration}>
                 <Text style={styles.emptyIllustrationIcon}>💬</Text>
@@ -226,6 +331,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: '#111827',
+  },
+  headerSpacer: {
+    width: 32,
   },
   statsBar: {
     flexDirection: 'row',
@@ -304,13 +412,19 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
   },
   preview: {
-    flex: 1,
     fontSize: 14,
     color: '#6B7280',
+    flexShrink: 1,
   },
   previewUnread: {
     color: '#111827',
     fontWeight: '500',
+  },
+  previewContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
   },
   trailingIndicators: {
     flexDirection: 'row',
@@ -327,6 +441,18 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 18,
     color: '#D1D5DB',
+  },
+  messageTicksContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 6,
+  },
+  messageTick: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  messageTickSecond: {
+    marginLeft: -4,
   },
   center: {
     flex: 1,

@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../config/supabaseClient';
 import { Profile } from '../types/profile';
+import { cacheService } from '../services/cache';
 
 interface AuthContextValue {
   session: Session | null;
@@ -63,7 +64,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const refreshProfile = async () => {
     if (!user) return;
-    setProfileLoading(true);
+    
+    // Load cached profile immediately
+    const cachedProfile = await cacheService.getProfile(user.id);
+    if (cachedProfile) {
+      setProfile(cachedProfile);
+      setProfileLoading(false);
+    } else {
+      setProfileLoading(true);
+    }
+
+    // Fetch fresh profile in background
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -75,7 +86,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.warn('Error loading profile', error.message);
     }
 
-    setProfile((data as Profile) ?? null);
+    const profileData = (data as Profile) ?? null;
+    setProfile(profileData);
+    if (profileData) {
+      await cacheService.setProfile(user.id, profileData);
+    }
     setProfileLoading(false);
   };
 

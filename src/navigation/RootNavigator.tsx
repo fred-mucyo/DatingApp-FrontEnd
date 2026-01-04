@@ -78,7 +78,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: '🥰MUTIMA' }}
+            options={{ title: 'MUTIMA' }}
           />
           <Stack.Screen
             name="Discovery"
@@ -98,7 +98,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Matches"
             component={MatchesScreen}
-            options={{ title: 'Messages (Beta)' }}
+            options={{ title: 'Messages' }}
           />
           <Stack.Screen
             name="MyProfile"

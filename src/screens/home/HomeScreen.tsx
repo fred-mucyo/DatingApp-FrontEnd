@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   View,
   Text,
@@ -31,6 +30,7 @@ import { getDailySuggestions, SuggestionProfile, sendLike, markProfilePassed } f
 import { verifyMatchExists, hasSentPreMatchMessage, sendPreMatchMessage, fetchMatchesWithLastMessage } from '../../services/chat';
 import { fetchIncomingLikes } from '../../services/likes';
 import { supabase } from '../../config/supabaseClient';
+import { cacheService } from '../../services/cache';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -58,28 +58,15 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const greetingName = profile?.name || user?.email || 'there';
 
-  const { greetingLine, greetingSubtext } = useMemo(() => {
-    const now = new Date();
-    const hours = now.getHours();
-    let sub = 'Ready to discover new connections?';
-    if (hours >= 5 && hours < 12) {
-      sub = 'Ready to start your day right?';
-    } else if (hours >= 12 && hours < 17) {
-      sub = 'Ready to discover new connections?';
-    } else {
-      sub = 'Ready to meet someone special?';
+  // Shuffle array to rotate suggestions
+  const shuffleArray = useCallback(<T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-
-    const weekday = now.toLocaleDateString(undefined, { weekday: 'long' });
-    const month = now.toLocaleDateString(undefined, { month: 'long' });
-    const day = now.getDate();
-    const dateString = `${weekday}, ${month} ${day}`;
-
-    return {
-      greetingLine: `Hi, ${greetingName}!`,
-      greetingSubtext: `${sub}  ·  ${dateString}`,
-    };
-  }, [greetingName]);
+    return shuffled;
+  }, []);
 
   const loadLikesToday = useCallback(async () => {
     const today = new Date().toISOString().substring(0, 10);
@@ -111,71 +98,130 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   }, [likesToday]);
 
   const loadSuggestions = useCallback(async () => {
-    setLoadingSuggestions(true);
+    if (!user) return;
+
+    // Load cached suggestions immediately
+    const cached = await cacheService.getSuggestions(user.id);
+    const cachedIndex = await cacheService.getSuggestionIndex(user.id);
+    
+    if (cached && cached.length > 0) {
+      // Rotate/shuffle suggestions for variety
+      const shuffled = shuffleArray(cached);
+      setSuggestions(shuffled);
+      
+      // Resume from last viewed index or random position
+      const startIndex = cachedIndex !== null && cachedIndex < shuffled.length 
+        ? cachedIndex 
+        : Math.floor(Math.random() * Math.min(5, shuffled.length));
+      setSuggestionIndex(startIndex);
+      setLoadingSuggestions(false); // Show cached data immediately
+    } else {
+      setLoadingSuggestions(true);
+    }
+
     try {
+      // Load fresh suggestions in background
       const data = await getDailySuggestions(5, 20);
-      console.log('HOME getDailySuggestions result:', {
-        count: data?.length ?? 0,
-        first: data && data.length > 0 ? data[0] : null,
-      });
+      
+      // If RPC didn't include photos, enrich from profiles table (in batches for performance)
+      const batchSize = 5;
+      const enriched: SuggestionProfile[] = [];
+      
+      for (let i = 0; i < (data ?? []).length; i += batchSize) {
+        const batch = (data ?? []).slice(i, i + batchSize);
+        const enrichedBatch = await Promise.all(
+          batch.map(async (p) => {
+            const anyP: any = p as any;
+            const rawProfilePhotos = anyP.profile_photos;
 
-      // If RPC didn't include photos, enrich from profiles table
-      const enriched = await Promise.all(
-        (data ?? []).map(async (p) => {
-          const anyP: any = p as any;
-          const rawProfilePhotos = anyP.profile_photos;
+            const hasPhotosArray =
+              Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0;
+            const hasPhotosString =
+              typeof rawProfilePhotos === 'string' && !!rawProfilePhotos;
 
-          const hasPhotosArray =
-            Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0;
-          const hasPhotosString =
-            typeof rawProfilePhotos === 'string' && !!rawProfilePhotos;
-
-          if (hasPhotosArray || hasPhotosString) {
-            return p;
-          }
-
-          try {
-            const { data: prof, error } = await supabase
-              .from('profiles')
-              .select('photos')
-              .eq('id', p.id)
-              .maybeSingle();
-
-            if (
-              !error &&
-              prof &&
-              Array.isArray(prof.photos) &&
-              prof.photos.length > 0
-            ) {
-              return {
-                ...p,
-                profile_photos: prof.photos,
-              } as SuggestionProfile;
+            if (hasPhotosArray || hasPhotosString) {
+              return p;
             }
-          } catch (err) {
-            console.log('HOME enrich suggestion error:', { id: p.id, err });
-          }
 
-          return p;
-        }),
-      );
+            try {
+              const { data: prof, error } = await supabase
+                .from('profiles')
+                .select('photos')
+                .eq('id', p.id)
+                .maybeSingle();
 
-      setSuggestions(enriched);
-      console.log('HOME suggestions length after enrich:', enriched.length);
+              if (
+                !error &&
+                prof &&
+                Array.isArray(prof.photos) &&
+                prof.photos.length > 0
+              ) {
+                return {
+                  ...p,
+                  profile_photos: prof.photos,
+                } as SuggestionProfile;
+              }
+            } catch (err) {
+              console.log('HOME enrich suggestion error:', { id: p.id, err });
+            }
+
+            return p;
+          }),
+        );
+        enriched.push(...enrichedBatch);
+      }
+      
+      // Rotate/shuffle for variety
+      const shuffled = shuffleArray(enriched);
+      setSuggestions(shuffled);
+      await cacheService.setSuggestions(user.id, shuffled);
+      
+      // Set starting index (resume from last or random)
+      const lastIndex = await cacheService.getSuggestionIndex(user.id);
+      const startIndex = lastIndex !== null && lastIndex < shuffled.length 
+        ? lastIndex 
+        : Math.floor(Math.random() * Math.min(5, shuffled.length));
+      setSuggestionIndex(startIndex);
+      await cacheService.setSuggestionIndex(user.id, startIndex);
+      
       setLocallyLikedIds([]);
-      setSuggestionIndex(0);
     } catch (e: any) {
       console.log('HOME getDailySuggestions error:', e);
-      Alert.alert('Error', e?.message ?? 'Failed to load suggestions');
+      if (!cached) {
+        Alert.alert('Error', e?.message ?? 'Failed to load suggestions');
+      }
     } finally {
       setLoadingSuggestions(false);
     }
-  }, []);
+  }, [user, shuffleArray]);
 
   useEffect(() => {
-    loadLikesToday();
-    loadSuggestions();
-  }, [loadLikesToday, loadSuggestions]);
+    if (!user) return;
+    
+    // Load immediately on mount
+    const loadCached = async () => {
+      await loadLikesToday();
+      
+      // Load cached suggestions immediately
+      const cached = await cacheService.getSuggestions(user.id);
+      const cachedIndex = await cacheService.getSuggestionIndex(user.id);
+      
+      if (cached && cached.length > 0) {
+        const shuffled = shuffleArray(cached);
+        setSuggestions(shuffled);
+        const startIndex = cachedIndex !== null && cachedIndex < shuffled.length 
+          ? cachedIndex 
+          : Math.floor(Math.random() * Math.min(5, shuffled.length));
+        setSuggestionIndex(startIndex);
+        setLoadingSuggestions(false);
+      }
+      
+      // Then load fresh data in background
+      loadSuggestions();
+    };
+    
+    loadCached();
+  }, [user, loadLikesToday, loadSuggestions, shuffleArray]);
 
   // ---- Badge counts for bottom navigation ----
 
@@ -188,11 +234,15 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const matches = await fetchMatchesWithLastMessage(user.id);
       let unread = 0;
       for (const m of matches) {
-        const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
-        const lastRead = await AsyncStorage.getItem(lastKey);
-        const lastMessageTime = m.last_message_created_at ?? m.created_at;
-        if (lastMessageTime) {
-          if (!lastRead || new Date(lastRead) < new Date(lastMessageTime)) {
+        // Only count if there's a last message AND it's from the other user (not you)
+        const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
+        
+        if (lastMessageFromOther && m.last_message_created_at) {
+          const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
+          const lastRead = await AsyncStorage.getItem(lastKey);
+          
+          // Only count as unread if last message is from other user and hasn't been read
+          if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
             unread += 1;
           }
         }
@@ -278,7 +328,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     if (suggestionIndex + 1 >= suggestions.length) {
       Alert.alert('End of feed', 'Come back tomorrow for new suggestions.');
     } else {
-      setSuggestionIndex((prev) => prev + 1);
+      const newIndex = suggestionIndex + 1;
+      setSuggestionIndex(newIndex);
+      // Save current index for rotation
+      if (user) {
+        await cacheService.setSuggestionIndex(user.id, newIndex);
+      }
     }
   };
 
@@ -302,9 +357,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       if (isMatch) {
         Alert.alert("It's a match!", `You and ${profileToLike.name} like each other.`);
       }
-      // After a like we advance, similar to a pass; no extra tracking needed
-      // because likes are already excluded in the simplified suggestion query.
-      handlePass();
+      // After a like we advance, similar to a pass
+      const newIndex = suggestionIndex + 1;
+      setSuggestionIndex(newIndex);
+      if (user) {
+        await cacheService.setSuggestionIndex(user.id, newIndex);
+      }
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to send like');
     } finally {
@@ -329,38 +387,50 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    try {
-      const match = await verifyMatchExists(user.id, profileId);
-      if (!match) {
-        const alreadySent = await hasSentPreMatchMessage(user.id, profileId);
-        if (alreadySent) {
-          Alert.alert(
-            'Message sent',
-            'You already sent a message to this person. You can chat freely once you match.',
-          );
-          return;
-        }
+    // Navigate immediately, check match in background
+    const target = suggestions.find((p) => p.id === profileId) ?? null;
+    if (!target) {
+      Alert.alert('Error', 'Could not open message composer for this profile.');
+      return;
+    }
 
-        const target = suggestions.find((p) => p.id === profileId) ?? null;
-        if (!target) {
-          Alert.alert('Error', 'Could not open message composer for this profile.');
-          return;
+    // Check match in background (don't block navigation)
+    verifyMatchExists(user.id, profileId)
+      .then((match) => {
+        if (match) {
+          // Navigate to chat if match exists
+          navigation.navigate('Chat', {
+            matchId: match.id,
+            otherUserId: match.other_user_id,
+            otherUserName: match.other_user_name,
+            otherUserPhoto: match.other_user_photo ?? undefined,
+          });
+        } else {
+          // Check if pre-match message was sent
+          hasSentPreMatchMessage(user.id, profileId)
+            .then((alreadySent) => {
+              if (alreadySent) {
+                Alert.alert(
+                  'Message sent',
+                  'You already sent a message to this person. You can chat freely once you match.',
+                );
+              } else {
+                setPreMatchTarget(target);
+                setPreMatchMessage('');
+              }
+            })
+            .catch(() => {
+              // If check fails, show pre-match modal
+              setPreMatchTarget(target);
+              setPreMatchMessage('');
+            });
         }
-
+      })
+      .catch(() => {
+        // If match check fails, show pre-match modal
         setPreMatchTarget(target);
         setPreMatchMessage('');
-        return;
-      }
-
-      navigation.navigate('Chat', {
-        matchId: match.id,
-        otherUserId: match.other_user_id,
-        otherUserName: match.other_user_name,
-        otherUserPhoto: match.other_user_photo ?? undefined,
       });
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to open chat');
-    }
   };
 
   const handleSendPreMatch = async () => {
@@ -477,12 +547,13 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
+  // Icons
   const PassIcon = () => (
-    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+    <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
       <Path
         d="M6 6l12 12M18 6L6 18"
-        stroke="#EF4444"
-        strokeWidth={2.5}
+        stroke="#FFFFFF"
+        strokeWidth={3}
         strokeLinecap="round"
       />
     </Svg>
@@ -492,16 +563,16 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
-        fill="#22C55E"
+        fill="#FFFFFF"
       />
     </Svg>
   );
 
   const MessageIcon = () => (
-    <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
       <Path
         d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-        stroke="#6366F1"
+        stroke="#FFFFFF"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -509,12 +580,38 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     </Svg>
   );
 
+  const ShareIcon = () => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx={18} cy={5} r={3} stroke="#1A1A1A" strokeWidth={2} />
+      <Circle cx={6} cy={12} r={3} stroke="#1A1A1A" strokeWidth={2} />
+      <Circle cx={18} cy={19} r={3} stroke="#1A1A1A" strokeWidth={2} />
+      <Path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="#1A1A1A" strokeWidth={2} />
+    </Svg>
+  );
+
+  const InfoIcon = () => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={9} stroke="#1A1A1A" strokeWidth={2} />
+      <Path d="M12 16v-4M12 8h.01" stroke="#1A1A1A" strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+
+  const LocationIcon = () => (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 3a6 6 0 0 0-6 6c0 4.2 4.5 8.7 5.6 9.8a.6.6 0 0 0 .8 0C13.5 17.7 18 13.2 18 9a6 6 0 0 0-6-6Z"
+        fill="#1A1A1A"
+      />
+      <Circle cx={12} cy={9} r={2} fill="#FFFFFF" />
+    </Svg>
+  );
+
   const HomeNavIcon = () => (
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
       <Path
         d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
-        fill="#F97316"
-        stroke="#F97316"
+        fill="#D4AF37"
+        stroke="#D4AF37"
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -527,27 +624,27 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
         d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
-        fill="#666666"
+        fill="#FFFFFF"
       />
     </Svg>
   );
 
   const ExploreNavIcon = () => (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={9} stroke="#666666" strokeWidth={2} />
+      <Circle cx={12} cy={12} r={9} stroke="#FFFFFF" strokeWidth={2} />
       <Path
         d="M10 14l1.2-3.8L15 9l-1.2 3.8L10 14Z"
-        fill="#666666"
+        fill="#FFFFFF"
       />
     </Svg>
   );
 
   const ProfileNavIcon = () => (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={8.5} r={3.5} stroke="#666666" strokeWidth={2} />
+      <Circle cx={12} cy={8.5} r={3.5} stroke="#FFFFFF" strokeWidth={2} />
       <Path
         d="M6 19c.8-2.4 3.1-4 6-4s5.2 1.6 6 4"
-        stroke="#666666"
+        stroke="#FFFFFF"
         strokeWidth={2}
         strokeLinecap="round"
       />
@@ -558,7 +655,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Path
         d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-        stroke="#666666"
+        stroke="#FFFFFF"
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -566,32 +663,15 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     </Svg>
   );
 
-  const LocationIcon = () => (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 3a6 6 0 0 0-6 6c0 4.2 4.5 8.7 5.6 9.8a.6.6 0 0 0 .8 0C13.5 17.7 18 13.2 18 9a6 6 0 0 0-6-6Z"
-        fill="#FFFFFF"
-        opacity={0.9}
-      />
-      <Circle cx={12} cy={9} r={2} fill="#1A1A1A" />
-    </Svg>
-  );
-
-  const ShareIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={18} cy={5} r={3} stroke="#FFFFFF" strokeWidth={2} />
-      <Circle cx={6} cy={12} r={3} stroke="#FFFFFF" strokeWidth={2} />
-      <Circle cx={18} cy={19} r={3} stroke="#FFFFFF" strokeWidth={2} />
-      <Path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98" stroke="#FFFFFF" strokeWidth={2} />
-    </Svg>
-  );
-
-  const InfoIcon = () => (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={9} stroke="#FFFFFF" strokeWidth={2} />
-      <Path d="M12 16v-4M12 8h.01" stroke="#FFFFFF" strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
+  const getRelationshipGoalLabel = (goal: string | null | undefined): string => {
+    if (!goal) return '';
+    const goalMap: Record<string, string> = {
+      serious: 'Serious',
+      casual: 'Casual',
+      both: 'Open',
+    };
+    return goalMap[goal.toLowerCase()] || goal.charAt(0).toUpperCase() + goal.slice(1);
+  };
 
   const renderSuggestionItem = ({ item }: { item: SuggestionProfile }) => {
     const alreadyLiked = locallyLikedIds.includes(item.id);
@@ -615,78 +695,89 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       }
     }
 
-    if (photos.length === 0) {
-      console.log('HOME renderSuggestionItem: no photo for item', {
-        id: item.id,
-        name: item.name,
-        profile_photos: rawProfilePhotos,
-        photos: rawPhotos,
-      });
-    } else {
-      console.log('HOME renderSuggestionItem: using photos', {
-        id: item.id,
-        name: item.name,
-        count: photos.length,
-      });
-    }
+    const primaryPhoto = photos.length > 0 ? photos[0] : null;
+    const interests = Array.isArray(item.interests) ? item.interests.filter(Boolean) : [];
+    const relationshipGoal = getRelationshipGoalLabel(item.relationship_goal);
 
     return (
-      <View style={styles.cardContainer}>
-        {photos.length > 0 ? (
-          // Local, lightweight photo swiping per profile using a ScrollView pager.
-          <ScrollView
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            style={styles.photoPager}
-          >
-            {photos.map((uri) => (
-              <Image
-                key={uri}
-                source={{ uri }}
-                style={styles.fullScreenImage}
-                onError={(e) => {
-                  console.log('HOME Image failed to load', {
-                    id: item.id,
-                    name: item.name,
-                    photo: uri,
-                    error: e.nativeEvent,
-                  });
-                }}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={[styles.fullScreenImage, styles.placeholderImage]}>
-            <Text style={styles.placeholderText}>No Photo</Text>
-          </View>
-        )}
-        
-        {/* Bottom gradient overlay */}
-<LinearGradient
-  colors={['transparent', 'rgba(0, 0, 0, 7)', 'rgba(0, 0, 0, 6)']}
-  locations={[0, 0.4, 1]}
-  style={styles.bottomGradient}
-/>
+      <View style={styles.cardWrapper}>
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+            {/* Photo Container */}
+            <View style={styles.photoContainer}>
+              {primaryPhoto ? (
+                <View style={styles.imageWrapper}>
+                  <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
+                </View>
+              ) : (
+                <View style={[styles.profilePhoto, styles.photoPlaceholder]}>
+                  <Text style={styles.photoPlaceholderText}>No Photo</Text>
+                </View>
+              )}
+              
+              {/* Info Button (top-left) */}
+              <TouchableOpacity
+                style={styles.photoInfoButton}
+                onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
+              >
+                <InfoIcon />
+              </TouchableOpacity>
 
-        {/* Profile info floating on image */}
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>
-            {item.name}{' '}
-            <Text style={styles.profileAge}>{item.age}</Text>
-          </Text>
-          <View style={styles.locationRow}>
-            <LocationIcon />
-            <Text style={styles.profileLocation}>
-              {item.city}, {item.country}
-            </Text>
-          </View>
-        </View>
+              {/* Share Button (top-right) */}
+              <TouchableOpacity
+                style={styles.photoShareButton}
+                onPress={handleShare}
+              >
+                <ShareIcon />
+              </TouchableOpacity>
+            </View>
 
-        {/* Action buttons floating on image */}
-        <View style={styles.actionButtonsRow}>
+            {/* Profile Info */}
+            <View style={styles.profileInfo}>
+              <View style={styles.nameRow}>
+                <Text style={styles.profileName}>
+                  {item.name}, {item.age}
+                </Text>
+                {relationshipGoal && (
+                  <View style={styles.intentBadge}>
+                    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={styles.intentBadgeIcon}>
+                      <Path
+                        d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
+                        fill="#FFFFFF"
+                      />
+                    </Svg>
+                    <Text style={styles.intentBadgeText}>{relationshipGoal}</Text>
+                  </View>
+                )}
+              </View>
+
+              <View style={styles.locationRow}>
+                <LocationIcon />
+                <Text style={styles.locationText}>
+                  {item.city} / {item.country}
+                </Text>
+              </View>
+
+              {item.bio && (
+                <Text style={styles.bioText}>{item.bio}</Text>
+              )}
+
+              {interests.length > 0 && (
+                <View style={styles.interestsContainer}>
+                  {interests.slice(0, 4).map((interest, index) => (
+                    <View key={index} style={styles.interestTag}>
+                      <Text style={styles.interestTagText}>{interest}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </View>
+
+        {/* Action Buttons */}
+        <View style={styles.actionButtonsContainer}>
           <TouchableOpacity
-            style={[styles.roundActionButton, styles.passButton]}
+            style={[styles.actionButton, styles.passButton]}
             onPress={() => handlePass(item)}
             disabled={liking}
           >
@@ -694,7 +785,14 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.roundActionButton, styles.likeButton]}
+            style={[styles.actionButton, styles.messageButton]}
+            onPress={() => handleMessage(item.id)}
+          >
+            <MessageIcon />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.likeButton]}
             onPress={() => handleLike(item)}
             disabled={liking || alreadyLiked}
           >
@@ -706,36 +804,17 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
               <LikeIcon />
             )}
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.roundActionButton, styles.messageButton]}
-            onPress={() => handleMessage(item.id)}
-          >
-            <MessageIcon />
-          </TouchableOpacity>
         </View>
-
-        {/* Info button (top left) */}
-        <TouchableOpacity style={styles.infoButton}>
-          <InfoIcon />
-        </TouchableOpacity>
       </View>
     );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <View style={styles.container}>
-        {/* Top Bar */}
-        <View style={styles.topBar}>
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-            <ShareIcon />
-          </TouchableOpacity>
-        </View>
-
         {loadingSuggestions ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#F97316" />
+            <ActivityIndicator size="large" color="#D4AF37" />
             <Text style={styles.loadingText}>Finding your perfect match...</Text>
           </View>
         ) : suggestions.length === 0 ? (
@@ -761,8 +840,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             style={styles.carousel}
-            refreshing={refreshing}
-            onRefresh={handlePullToRefresh}
+            contentContainerStyle={styles.carouselContent}
           />
         )}
 
@@ -881,11 +959,11 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Modal>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
- const styles = StyleSheet.create({
+const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#1A1A1A',
@@ -894,147 +972,197 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     flex: 1,
     backgroundColor: '#1A1A1A',
   },
-  topBar: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    right: 20,
-    zIndex: 10,
-  },
-  shareButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
   carousel: {
     flex: 1,
   },
-  cardContainer: {
+  carouselContent: {
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 0,
+  },
+  cardWrapper: {
     width: width,
-    height: height - 100,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: 0,
+  },
+  profileCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#C97A5F',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: 'hidden',
+    width: '100%',
+    maxHeight: height * 0.78,
+  },
+  photoContainer: {
+    width: '100%',
+    height: height * 0.48,
     position: 'relative',
+    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
   },
-  fullScreenImage: {
-    width: width,
-    height: height - 100,
-    resizeMode: 'cover',
+  imageWrapper: {
+    width: '100%',
+    height: '120%',
+    position: 'absolute',
+    left: 0,
+    overflow: 'hidden',
   },
-  photoPager: {
-    width: width,
-    height: height - 100,
+  profilePhoto: {
+    width: '100%',
+    height: '100%',
   },
-  placeholderImage: {
-    backgroundColor: '#2A2A2A',
+  photoPlaceholder: {
+    backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  placeholderText: {
+  photoPlaceholderText: {
     fontSize: 16,
-    color: '#666666',
+    color: '#9CA3AF',
     fontWeight: '500',
-    letterSpacing: 0.3,
   },
-  bottomGradient: {
+  photoInfoButton: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 300,
-
+    top: 16,
+    left: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  photoShareButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   profileInfo: {
-    position: 'absolute',
-    bottom: 170,
-    left: 24,
-    right: 24,
+    padding: 16,
+    paddingBottom: 12,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    flexWrap: 'wrap',
+    gap: 8,
   },
   profileName: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 6,
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.6)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 6,
-  },
-  profileAge: {
     fontSize: 28,
-    fontWeight: '400',
-    letterSpacing: -0.3,
+    fontWeight: '700',
+    color: '#1A1A1A',
+    letterSpacing: -0.5,
+  },
+  intentBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    gap: 4,
+  },
+  intentBadgeIcon: {
+    width: 12,
+    height: 12,
+  },
+  intentBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 12,
     gap: 6,
   },
-  profileLocation: {
-    fontSize: 16,
-    color: '#FFFFFF',
+  locationText: {
+    fontSize: 14,
+    color: '#1A1A1A',
     fontWeight: '500',
-    letterSpacing: 0.2,
-    opacity: 0.95,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
   },
-  actionButtonsRow: {
-    position: 'absolute',
-    bottom: 90,
-    left: 0,
-    right: 0,
+  bioText: {
+    fontSize: 13,
+    color: '#666666',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  interestsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  interestTag: {
+    backgroundColor: '#F5F5DC',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  interestTagText: {
+    fontSize: 12,
+    color: '#1A1A1A',
+    fontWeight: '500',
+  },
+  actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 20,
-    paddingHorizontal: 24,
+    gap: 24,
+    marginTop: 16,
+    marginBottom: 16,
   },
-  roundActionButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  actionButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 35,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOpacity: 0.25,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
     elevation: 6,
-    backgroundColor: '#FFFFFF',
+    marginBottom: 70,
   },
   passButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
-  likeButton: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
+    backgroundColor: '#9CA3AF',
   },
   messageButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    backgroundColor: '#6366F1',
   },
-  infoButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20,
-    left: 20,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
+  likeButton: {
+    backgroundColor: '#22C55E',
+  },
+  likedLabel: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -1096,21 +1224,19 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   },
   bottomNavContainer: {
     position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(26, 26, 26, 0.95)',
+    // paddingTop: ,
+    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   bottomNav: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 30,
-    shadowColor: '#000000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 6 },
-    shadowRadius: 16,
-    elevation: 10,
+    paddingBottom: 8,
   },
   navItem: {
     flex: 1,
@@ -1127,13 +1253,13 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   },
   navLabel: {
     fontSize: 11,
-    color: '#666666',
+    color: '#FFFFFF',
     fontWeight: '600',
     marginTop: 2,
     letterSpacing: 0.2,
   },
   navLabelActive: {
-    color: '#F97316',
+    color: '#D4AF37',
     fontWeight: '700',
   },
   badge: {
@@ -1146,7 +1272,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: '#1A1A1A',
     shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowRadius: 2,

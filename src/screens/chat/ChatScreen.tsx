@@ -12,22 +12,29 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Modal,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
-import { DAILY_MESSAGE_LIMIT, fetchMessages, getMessageCountToday, sendChatMessage } from '../../services/chat';
+import {
+  DAILY_MESSAGE_LIMIT,
+  fetchRecentMessages,
+  fetchMessages,
+  getMessageCountToday,
+  sendChatMessage,
+  markMessagesAsDelivered,
+  markMessagesAsRead,
+  ChatMessage,
+} from '../../services/chat';
 import { supabase } from '../../config/supabaseClient';
+import { submitReport, ReportReason } from '../../services/reports';
+import { cacheService } from '../../services/cache';
 
 export type ChatScreenProps = NativeStackScreenProps<RootStackParamList, 'Chat'>;
 
-interface MessageItem {
-  id: string;
-  match_id: string;
-  sender_id: string;
-  content: string;
-  created_at: string;
-}
+// Use ChatMessage from service
+type MessageItem = ChatMessage;
 
 export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => {
   const { matchId, otherUserName, otherUserId, otherUserPhoto } = route.params;
@@ -37,9 +44,42 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [messagesLeft, setMessagesLeft] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
+  const [showMenu, setShowMenu] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason | null>(null);
+  const [reportDescription, setReportDescription] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
   const flatListRef = useRef<FlatList<MessageItem>>(null);
 
-  const handleBlockAndExit = async () => {
+  const handleUnmatch = async () => {
+    if (!user) return;
+    try {
+      // Delete the match
+      const { error } = await supabase
+        .from('matches')
+        .delete()
+        .or(
+          `and(user1_id.eq.${user.id},user2_id.eq.${otherUserId}),and(user1_id.eq.${otherUserId},user2_id.eq.${user.id})`,
+        );
+
+      if (error) {
+        Alert.alert('Error', error.message ?? 'Failed to unmatch');
+        return;
+      }
+
+      // Invalidate cache
+      await cacheService.invalidate(`matches_${user.id}`);
+      Alert.alert('Unmatched', 'You have unmatched with this user.');
+      setShowMenu(false);
+      navigation.popToTop();
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Failed to unmatch');
+    }
+  };
+
+  const handleBlock = async () => {
     if (!user) return;
     try {
       const { error } = await supabase.from('blocks').insert({
@@ -47,13 +87,34 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
         blocked_id: otherUserId,
       });
       if (error) {
-        Alert.alert('Error', error.message ?? 'Failed to update');
+        Alert.alert('Error', error.message ?? 'Failed to block');
         return;
       }
-      Alert.alert('Done', 'You will no longer see this match or messages from this user.');
+      // Invalidate cache
+      await cacheService.invalidate(`matches_${user.id}`);
+      Alert.alert('Blocked', 'You have blocked this user.');
+      setShowMenu(false);
       navigation.popToTop();
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Failed to update');
+      Alert.alert('Error', e.message ?? 'Failed to block');
+    }
+  };
+
+  const handleReport = async () => {
+    if (!user || !reportReason) return;
+
+    setSubmittingReport(true);
+    try {
+      await submitReport(user.id, otherUserId, null, reportReason, reportDescription || undefined);
+      Alert.alert('Report submitted', 'Thank you for your report. We will review it shortly.');
+      setShowReportModal(false);
+      setShowMenu(false);
+      setReportReason(null);
+      setReportDescription('');
+    } catch (e: any) {
+      Alert.alert('Error', e.message ?? 'Failed to submit report');
+    } finally {
+      setSubmittingReport(false);
     }
   };
 
@@ -62,43 +123,45 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
   };
 
   const openHeaderMenu = () => {
-    Alert.alert(
-      'Conversation options',
-      undefined,
-      [
-        {
-          text: 'View profile',
-          onPress: () => navigation.navigate('ViewUserProfile', { userId: otherUserId }),
-        },
-        {
-          text: 'Unmatch',
-          style: 'destructive',
-          onPress: handleBlockAndExit,
-        },
-        {
-          text: 'Block & report',
-          style: 'destructive',
-          onPress: handleBlockAndExit,
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ],
-    );
+    setShowMenu(true);
   };
+
+  const reportReasons: { value: ReportReason; label: string }[] = [
+    { value: 'harassment', label: 'Harassment' },
+    { value: 'spam', label: 'Spam' },
+    { value: 'fake_profile', label: 'Fake Profile' },
+    { value: 'inappropriate_content', label: 'Inappropriate Content' },
+    { value: 'scam', label: 'Scam' },
+    { value: 'other', label: 'Other' },
+  ];
 
   useEffect(() => {
     const load = async () => {
       if (!user) return;
+      
+      // Load from cache first
+      const cachedMessages = await cacheService.getMessages(matchId);
+      if (cachedMessages && cachedMessages.length > 0) {
+        setMessages(cachedMessages);
+        setHasMoreMessages(cachedMessages.length >= 20);
+        setTimeout(scrollToBottom, 50);
+      }
+      
       setLoading(true);
       try {
         const [msgs, count] = await Promise.all([
-          fetchMessages(matchId, 100),
+          fetchRecentMessages(matchId, 20),
           getMessageCountToday(user.id),
         ]);
         setMessages(msgs);
+        await cacheService.setMessages(matchId, msgs);
         setMessagesLeft(Math.max(0, DAILY_MESSAGE_LIMIT - count));
+        setHasMoreMessages(msgs.length >= 20);
+        
+        // Mark messages as delivered/read in background (don't wait)
+        markMessagesAsDelivered(matchId, user.id).catch(() => {});
+        markMessagesAsRead(matchId, user.id).catch(() => {});
+        
         setTimeout(scrollToBottom, 100);
       } catch (e: any) {
         Alert.alert('Error', e.message ?? 'Failed to load chat');
@@ -119,10 +182,39 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
           table: 'messages',
           filter: `match_id=eq.${matchId}`,
         },
-        (payload) => {
+        async (payload) => {
           const newMessage = payload.new as MessageItem;
-          setMessages((prev) => [...prev, newMessage]);
+          setMessages((prev) => {
+            // Avoid duplicates
+            if (prev.some((m) => m.id === newMessage.id)) return prev;
+            const updated = [...prev, newMessage];
+            // Update cache
+            cacheService.setMessages(matchId, updated).catch(() => {});
+            return updated;
+          });
+          
+          // If message is from other user, mark as delivered immediately (don't wait)
+          if (newMessage.sender_id !== user?.id) {
+            markMessagesAsDelivered(matchId, user?.id || '').catch(() => {});
+            markMessagesAsRead(matchId, user?.id || '').catch(() => {});
+          }
+          
           setTimeout(scrollToBottom, 50);
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `match_id=eq.${matchId}`,
+        },
+        (payload) => {
+          const updatedMessage = payload.new as MessageItem;
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === updatedMessage.id ? updatedMessage : msg)),
+          );
         },
       )
       .subscribe();
@@ -142,27 +234,76 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
 
     setSending(true);
     try {
-      await sendChatMessage(user.id, matchId, input);
+      const newMessage = await sendChatMessage(user.id, matchId, input);
       setInput('');
       if (messagesLeft !== null) {
         setMessagesLeft(Math.max(0, messagesLeft - 1));
       }
-      // Refresh messages so the newly-sent message appears immediately
-      try {
-        const updated = await fetchMessages(matchId, 100);
-        setMessages(updated);
-        setTimeout(scrollToBottom, 50);
-      } catch (e: any) {
-        // If this fails, the realtime subscription will still pick up the message,
-        // so we just surface a soft error.
-        // eslint-disable-next-line no-console
-        console.warn('Failed to refresh messages after send', e?.message ?? e);
-      }
+      // Add message immediately to UI (optimistic update)
+      setMessages((prev) => {
+        // Avoid duplicates
+        if (prev.some((m) => m.id === newMessage.id)) return prev;
+        const updated = [...prev, newMessage];
+        // Update cache
+        cacheService.setMessages(matchId, updated).catch(() => {});
+        return updated;
+      });
+      setTimeout(scrollToBottom, 50);
     } catch (e: any) {
       Alert.alert('Error', e.message ?? 'Failed to send message');
     } finally {
       setSending(false);
     }
+  };
+
+  const loadMoreMessages = async () => {
+    if (loadingMore || !hasMoreMessages || messages.length === 0) return;
+    
+    setLoadingMore(true);
+    try {
+      // Load older messages (before the oldest current message)
+      const oldestMessage = messages[0];
+      const moreMessages = await fetchMessages(matchId, 20, messages.length);
+      
+      if (moreMessages.length === 0 || moreMessages.length < 20) {
+        setHasMoreMessages(false);
+      }
+      
+      if (moreMessages.length > 0) {
+        // Prepend older messages to the beginning
+        setMessages((prev) => [...moreMessages, ...prev]);
+      }
+    } catch (e: any) {
+      console.warn('Failed to load more messages:', e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // WhatsApp-style tick component
+  const MessageTicks = ({ message }: { message: MessageItem }) => {
+    const isMine = message.sender_id === user?.id;
+    if (!isMine) return null; // Only show ticks for sent messages
+
+    const isRead = !!message.read_at;
+    const isDelivered = !!message.delivered_at;
+
+    // 1 tick = sent, 2 ticks = delivered, 2 orange ticks = read
+    const tickColor = isRead ? '#F97316' : '#9CA3AF'; // Primary color if read, gray if not
+    const tickCount = isDelivered ? 2 : 1;
+
+    return (
+      <View style={styles.tickContainer}>
+        {tickCount === 1 ? (
+          <Text style={[styles.tick, { color: tickColor }]}>✓</Text>
+        ) : (
+          <>
+            <Text style={[styles.tick, { color: tickColor }]}>✓</Text>
+            <Text style={[styles.tick, { color: tickColor, marginLeft: -4 }]}>✓</Text>
+          </>
+        )}
+      </View>
+    );
   };
 
   const renderItem = ({ item, index }: { item: MessageItem; index: number }) => {
@@ -223,14 +364,22 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
           </View>
         </View>
         {isLastInGroup && (
-          <Text
+          <View
             style={[
-              styles.timestamp,
-              isMine ? styles.timestampMine : styles.timestampTheirs,
+              styles.timestampRow,
+              isMine ? styles.timestampRowMine : styles.timestampRowTheirs,
             ]}
           >
-            {timeLabel}
-          </Text>
+            <Text
+              style={[
+                styles.timestamp,
+                isMine ? styles.timestampMine : styles.timestampTheirs,
+              ]}
+            >
+              {timeLabel}
+            </Text>
+            {isMine && <MessageTicks message={item} />}
+          </View>
         )}
       </View>
     );
@@ -346,6 +495,21 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
               contentContainerStyle={styles.listContent}
               onContentSizeChange={scrollToBottom}
               showsVerticalScrollIndicator={false}
+              onScroll={(event) => {
+                const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
+                // Load more when scrolled near top (within 200px from top)
+                if (contentOffset.y < 200 && hasMoreMessages && !loadingMore && messages.length > 0) {
+                  loadMoreMessages();
+                }
+              }}
+              scrollEventThrottle={400}
+              ListHeaderComponent={
+                loadingMore ? (
+                  <View style={styles.loadingMoreContainer}>
+                    <ActivityIndicator size="small" color="#9CA3AF" />
+                  </View>
+                ) : null
+              }
             />
           )}
         </View>
@@ -381,6 +545,160 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Conversation Options Menu Modal */}
+        <Modal
+          visible={showMenu}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowMenu(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowMenu(false)}
+          >
+            <View style={styles.menuContainer} onStartShouldSetResponder={() => true}>
+              <View style={styles.menuHeader}>
+                <Text style={styles.menuTitle}>Conversation options</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowMenu(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  setShowMenu(false);
+                  navigation.navigate('ViewUserProfile', { userId: otherUserId });
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.menuItemText}>View profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuItem, styles.menuItemDestructive]}
+                onPress={handleUnmatch}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.menuItemText, styles.menuItemTextDestructive]}>
+                  Unmatch
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuItem, styles.menuItemDestructive]}
+                onPress={handleBlock}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.menuItemText, styles.menuItemTextDestructive]}>Block</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.menuItem, styles.menuItemDestructive]}
+                onPress={() => {
+                  setShowMenu(false);
+                  setShowReportModal(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.menuItemText, styles.menuItemTextDestructive]}>Report</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        {/* Report Modal */}
+        <Modal
+          visible={showReportModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowReportModal(false)}
+        >
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowReportModal(false)}
+          >
+            <View style={styles.reportModalContainer} onStartShouldSetResponder={() => true}>
+              <View style={styles.reportModalHeader}>
+                <Text style={styles.reportModalTitle}>Report user</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => {
+                    setShowReportModal(false);
+                    setReportReason(null);
+                    setReportDescription('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.closeButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <Text style={styles.reportModalSubtitle}>
+                Why are you reporting {otherUserName}?
+              </Text>
+
+              <View style={styles.reportReasonsContainer}>
+                {reportReasons.map((reason) => (
+                  <TouchableOpacity
+                    key={reason.value}
+                    style={[
+                      styles.reportReasonButton,
+                      reportReason === reason.value && styles.reportReasonButtonSelected,
+                    ]}
+                    onPress={() => setReportReason(reason.value)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.reportReasonText,
+                        reportReason === reason.value && styles.reportReasonTextSelected,
+                      ]}
+                    >
+                      {reason.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {reportReason === 'other' && (
+                <TextInput
+                  style={styles.reportDescriptionInput}
+                  placeholder="Please provide more details..."
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  numberOfLines={4}
+                  value={reportDescription}
+                  onChangeText={setReportDescription}
+                  maxLength={500}
+                />
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.reportSubmitButton,
+                  (!reportReason || submittingReport) && styles.reportSubmitButtonDisabled,
+                ]}
+                onPress={handleReport}
+                disabled={!reportReason || submittingReport}
+                activeOpacity={0.8}
+              >
+                {submittingReport ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.reportSubmitButtonText}>Submit report</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -526,16 +844,39 @@ const styles = StyleSheet.create({
   textTheirs: {
     color: '#111827',
   },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 2,
+  },
+  timestampRowMine: {
+    justifyContent: 'flex-end',
+  },
+  timestampRowTheirs: {
+    justifyContent: 'flex-start',
+  },
   timestamp: {
     fontSize: 11,
     color: '#9CA3AF',
-    marginTop: 2,
   },
   timestampMine: {
     textAlign: 'right',
   },
   timestampTheirs: {
     textAlign: 'left',
+  },
+  tickContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 4,
+  },
+  tick: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingMoreContainer: {
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   dateSeparatorWrapper: {
     alignItems: 'center',
@@ -658,5 +999,157 @@ const styles = StyleSheet.create({
   promptChipText: {
     fontSize: 13,
     color: '#111827',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  menuContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    width: '85%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  menuHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  menuTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#6B7280',
+    fontWeight: '600',
+  },
+  menuItem: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  menuItemDestructive: {
+    borderBottomColor: '#FEE2E2',
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  menuItemTextDestructive: {
+    color: '#DC2626',
+  },
+  // Report modal styles
+  reportModalContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: '90%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  reportModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  reportModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  reportModalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  reportReasonsContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  reportReasonButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  reportReasonButtonSelected: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#F97316',
+  },
+  reportReasonText: {
+    fontSize: 15,
+    color: '#111827',
+    fontWeight: '500',
+  },
+  reportReasonTextSelected: {
+    color: '#F97316',
+    fontWeight: '600',
+  },
+  reportDescriptionInput: {
+    marginHorizontal: 20,
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#F9FAFB',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    fontSize: 14,
+    color: '#111827',
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  reportSubmitButton: {
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reportSubmitButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+  },
+  reportSubmitButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

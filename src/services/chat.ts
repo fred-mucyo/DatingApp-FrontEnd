@@ -14,6 +14,9 @@ export interface MatchItem {
   other_user_photo: string | null;
   last_message_content: string | null;
   last_message_created_at: string | null;
+  last_message_sender_id: string | null;
+  last_message_delivered_at: string | null;
+  last_message_read_at: string | null;
 }
 
 export interface ChatMessage {
@@ -22,6 +25,8 @@ export interface ChatMessage {
   sender_id: string;
   content: string;
   created_at: string;
+  delivered_at: string | null;
+  read_at: string | null;
 }
 
 export interface PreMatchMessage {
@@ -92,6 +97,9 @@ export const verifyMatchExists = async (
     other_user_photo: otherPhoto,
     last_message_content: null,
     last_message_created_at: null,
+    last_message_sender_id: null,
+    last_message_delivered_at: null,
+    last_message_read_at: null,
   };
 };
 
@@ -129,10 +137,10 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
 
     if (blocked) continue;
 
-    // fetch last message for this match
+    // fetch last message for this match (include sender_id, delivered_at, read_at for read receipts)
     const { data: lastMsg } = await supabase
       .from('messages')
-      .select('id, content, created_at')
+      .select('id, content, created_at, sender_id, delivered_at, read_at')
       .eq('match_id', m.id)
       .order('created_at', { ascending: false })
       .limit(1)
@@ -149,6 +157,9 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
       other_user_photo: otherPhoto,
       last_message_content: lastMsg?.content ?? null,
       last_message_created_at: lastMsg?.created_at ?? null,
+      last_message_sender_id: (lastMsg as any)?.sender_id ?? null,
+      last_message_delivered_at: (lastMsg as any)?.delivered_at ?? null,
+      last_message_read_at: (lastMsg as any)?.read_at ?? null,
     });
   }
 
@@ -163,16 +174,35 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
 export const fetchMessages = async (
   matchId: string,
   limit = 50,
+  offset = 0,
 ): Promise<ChatMessage[]> => {
   const { data, error } = await supabase
     .from('messages')
     .select('*')
     .eq('match_id', matchId)
-    .order('created_at', { ascending: true })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+  // Reverse to show oldest first (ascending order)
+  return ((data as ChatMessage[]) ?? []).reverse();
+};
+
+// Optimized: Fetch only recent messages initially
+export const fetchRecentMessages = async (
+  matchId: string,
+  limit = 20,
+): Promise<ChatMessage[]> => {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('*')
+    .eq('match_id', matchId)
+    .order('created_at', { ascending: false })
     .limit(limit);
 
   if (error) throw error;
-  return (data as ChatMessage[]) ?? [];
+  // Reverse to show oldest first
+  return ((data as ChatMessage[]) ?? []).reverse();
 };
 
 // --- Pre-match messaging helpers ---
@@ -263,9 +293,9 @@ export const sendChatMessage = async (
   userId: string,
   matchId: string,
   content: string,
-): Promise<void> => {
+): Promise<ChatMessage> => {
   const trimmed = content.trim();
-  if (!trimmed) return;
+  if (!trimmed) throw new Error('Message cannot be empty');
 
   const countToday = await getMessageCountToday(userId);
   if (countToday >= DAILY_MESSAGE_LIMIT) {
@@ -277,13 +307,56 @@ export const sendChatMessage = async (
     throw new Error('You have sent too many messages in a short time. Please wait.');
   }
 
-  const { error } = await supabase.from('messages').insert({
-    match_id: matchId,
-    sender_id: userId,
-    content: trimmed,
-  });
+  const { data, error } = await supabase
+    .from('messages')
+    .insert({
+      match_id: matchId,
+      sender_id: userId,
+      content: trimmed,
+      delivered_at: null,
+      read_at: null,
+    })
+    .select('*')
+    .single();
 
   if (error) throw error;
 
   await incrementMessageCount(userId);
+  return data as ChatMessage;
+};
+
+// Mark messages as delivered when recipient opens chat
+export const markMessagesAsDelivered = async (
+  matchId: string,
+  recipientId: string,
+): Promise<void> => {
+  const { error } = await supabase
+    .from('messages')
+    .update({ delivered_at: new Date().toISOString() })
+    .eq('match_id', matchId)
+    .neq('sender_id', recipientId) // Only mark messages NOT sent by recipient
+    .is('delivered_at', null); // Only update if not already delivered
+
+  if (error) {
+    console.warn('Failed to mark messages as delivered:', error);
+    // Don't throw - this is not critical
+  }
+};
+
+// Mark messages as read when recipient views them
+export const markMessagesAsRead = async (
+  matchId: string,
+  recipientId: string,
+): Promise<void> => {
+  const { error } = await supabase
+    .from('messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('match_id', matchId)
+    .neq('sender_id', recipientId) // Only mark messages NOT sent by recipient
+    .is('read_at', null); // Only update if not already read
+
+  if (error) {
+    console.warn('Failed to mark messages as read:', error);
+    // Don't throw - this is not critical
+  }
 };

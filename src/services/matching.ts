@@ -51,7 +51,8 @@ export const markProfilePassed = async (profileId: string): Promise<void> => {
 // Fetch a broad set of candidate profiles and apply *only* minimal filtering
 // (self, blocked users, liked users, and locally passed users). Preferences
 // like gender/location are used only for simple ordering, not to exclude.
-const fetchLooseSuggestions = async (limit = 20): Promise<SuggestionProfile[]> => {
+// Supports pagination with offset
+const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<SuggestionProfile[]> => {
   const { data: sessionData, error: sErr } = await supabase.auth.getSession();
   if (sErr || !sessionData.session) throw new Error('Not authenticated');
   const me = sessionData.session.user.id;
@@ -122,7 +123,9 @@ const fetchLooseSuggestions = async (limit = 20): Promise<SuggestionProfile[]> =
   });
 
   scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit).map((s) => s.profile);
+  // Apply pagination - get all scored first, then slice
+  const allScored = scored.map((s) => s.profile);
+  return allScored.slice(offset, offset + limit);
 };
 
 export const getDailySuggestions = async (
@@ -149,7 +152,8 @@ export const getDailySuggestions = async (
   }
 
   // Use simplified, availability-first logic instead of strict RPC rules.
-  const profiles = await fetchLooseSuggestions(limit);
+  // Load all suggestions at once (scoring requires all candidates)
+  const profiles = await fetchLooseSuggestions(limit, 0);
   const payload: CachedSuggestions = {
     generatedAt: today,
     profiles,

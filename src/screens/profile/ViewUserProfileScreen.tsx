@@ -19,6 +19,7 @@ import { supabase } from '../../config/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { sendLike } from '../../services/matching';
 import { verifyMatchExists } from '../../services/chat';
+import { cacheService } from '../../services/cache';
 
 export type ViewUserProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'ViewUserProfile'>;
 
@@ -55,7 +56,15 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
 
   useEffect(() => {
     const run = async () => {
-      setLoading(true);
+      // Load from cache first
+      const cachedProfile = await cacheService.getProfile(userId);
+      if (cachedProfile) {
+        setProfile(cachedProfile);
+        setLoading(false); // Show cached data immediately
+      } else {
+        setLoading(true);
+      }
+
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -68,35 +77,40 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
           return;
         }
 
-        setProfile((data as ViewProfile) ?? null);
+        const profileData = (data as ViewProfile) ?? null;
+        setProfile(profileData);
+        if (profileData) {
+          await cacheService.setProfile(userId, profileData);
+        }
 
         if (user && user.id !== userId) {
-          try {
-            const match = await verifyMatchExists(user.id, userId);
-            setHasMatch(!!match);
-          } catch {
-            // ignore match check errors for UI
-          }
-          try {
-            const { data: me, error: meErr } = await supabase
+          // Load match status and interests in parallel (don't block UI)
+          Promise.all([
+            verifyMatchExists(user.id, userId).then((match) => {
+              setHasMatch(!!match);
+            }).catch(() => {}),
+            supabase
               .from('profiles')
               .select('interests')
               .eq('id', user.id)
-              .maybeSingle();
-            if (!meErr && me && Array.isArray((me as any).interests)) {
-              setMyInterests(((me as any).interests as string[]).filter(Boolean));
-            }
-          } catch {
-            // ignore own interests loading errors
-          }
+              .maybeSingle()
+              .then(({ data: me, error: meErr }) => {
+                if (!meErr && me && Array.isArray((me as any).interests)) {
+                  setMyInterests(((me as any).interests as string[]).filter(Boolean));
+                }
+              })
+              .catch(() => {}),
+          ]);
         }
+      } catch (error) {
+        console.warn('Failed to load profile:', error);
       } finally {
         setLoading(false);
       }
     };
 
     run();
-  }, [userId]);
+  }, [userId, user]);
 
   if (loading) {
     return (

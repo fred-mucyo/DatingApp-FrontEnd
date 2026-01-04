@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -15,19 +16,35 @@ import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../config/supabaseClient';
 import { denyLike, fetchIncomingLikes, IncomingLikeProfile, likeBackAndRemove } from '../../services/likes';
+import { cacheService } from '../../services/cache';
 
 export type LikesScreenProps = NativeStackScreenProps<RootStackParamList, 'Likes'>;
 
 export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<IncomingLikeProfile[]>([]);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  const loadLikes = async () => {
+  const loadLikes = useCallback(async (showLoading = false) => {
     if (!user) return;
-    setLoading(true);
+    
+    if (showLoading) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     try {
+      // Try cache first
+      const cached = await cacheService.getLikes(user.id);
+      if (cached && cached.length > 0) {
+        setItems(cached);
+        setHasLoadedOnce(true);
+      }
+
       const data = await fetchIncomingLikes(user.id);
 
       const enriched = await Promise.all(
@@ -86,17 +103,44 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
       const filtered = enriched.filter((item) => !likedBackUserIds.has(item.user_id));
 
       setItems(filtered);
+      await cacheService.setLikes(user.id, filtered);
+      setHasLoadedOnce(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to load likes');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [user]);
 
+  // Load cached data immediately
   useEffect(() => {
-    loadLikes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+    if (!user) return;
+    
+    const loadCached = async () => {
+      const cached = await cacheService.getLikes(user.id);
+      if (cached && cached.length > 0) {
+        setItems(cached);
+        setHasLoadedOnce(true);
+      } else {
+        // If no cache, show loading
+        setLoading(true);
+      }
+      // Refresh in background
+      loadLikes(false);
+    };
+    
+    loadCached();
+  }, [user, loadLikes]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        loadLikes(false);
+      }
+    }, [user, loadLikes])
+  );
 
   const handleLikeBack = async (item: IncomingLikeProfile) => {
     if (!user) return;
@@ -104,6 +148,9 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
     try {
       await likeBackAndRemove(user.id, item.user_id, item.like_id);
       setItems((prev) => prev.filter((p) => p.like_id !== item.like_id));
+      // Invalidate caches
+      await cacheService.invalidate(`likes_${user.id}`);
+      await cacheService.invalidate(`matches_${user.id}`);
       Alert.alert("It's a match!", `You and ${item.name ?? 'this user'} like each other.`);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to like back');
@@ -113,10 +160,13 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   };
 
   const handleDeny = async (item: IncomingLikeProfile) => {
+    if (!user) return;
     setActioningId(item.like_id);
     try {
       await denyLike(item.like_id);
       setItems((prev) => prev.filter((p) => p.like_id !== item.like_id));
+      // Invalidate cache
+      await cacheService.invalidate(`likes_${user.id}`);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to remove like');
     } finally {
@@ -216,11 +266,11 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
         </View>
 
         <View style={styles.contentArea}>
-          {loading ? (
+          {loading && !hasLoadedOnce ? (
             <View style={styles.center}>
-              <ActivityIndicator />
+              <ActivityIndicator size="large" color="#F97316" />
             </View>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && hasLoadedOnce && !refreshing ? (
             emptyState
           ) : (
             <FlatList
