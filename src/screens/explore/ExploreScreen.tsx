@@ -671,8 +671,10 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
   const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female' | 'other'>('all');
   const [locationFilter, setLocationFilter] = useState('');
+  const [nameFilter, setNameFilter] = useState('');
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [profiles, setProfiles] = useState<ExploreProfile[]>([]);
   const [info, setInfo] = useState('');
@@ -696,6 +698,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       let query = supabase
         .from('profiles')
         .select('id, name, age, gender, city, country, photos')
+
         .eq('is_complete', true)
         .neq('id', user.id)
         .limit(50);
@@ -707,6 +710,11 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       if (locationFilter.trim()) {
         const loc = locationFilter.trim();
         query = query.or(`city.ilike.%${loc}%,country.ilike.%${loc}%`);
+      }
+
+      if (nameFilter.trim()) {
+        const name = nameFilter.trim();
+        query = query.ilike('name', `%${name}%`);
       }
 
       if (minAge) {
@@ -769,9 +777,28 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-     
-
         <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.searchBarContainer}>
+            <View style={styles.searchBar}>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search by name..."
+                placeholderTextColor="#9CA3AF"
+                value={nameFilter}
+                onChangeText={setNameFilter}
+                returnKeyType="search"
+                onSubmitEditing={handleSearch}
+              />
+              <TouchableOpacity
+                onPress={handleSearch}
+                activeOpacity={0.8}
+                style={styles.searchIconButton}
+              >
+                <Text style={styles.searchIcon}>🔍</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <View style={styles.filterSummaryRow}>
             <View style={styles.filterChipsRow}>
               {genderFilter !== 'all' && (
@@ -796,7 +823,6 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
               )}
             </View>
             <TouchableOpacity onPress={() => setFiltersOpen((prev) => !prev)}>
-            
             </TouchableOpacity>
           </View>
 
@@ -862,6 +888,7 @@ export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
                   onPress={() => {
                     setGenderFilter('all');
                     setLocationFilter('');
+                    setNameFilter('');
                     setMinAge('');
                     setMaxAge('');
                   }}
@@ -997,6 +1024,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 24,
+  },
+  searchBarContainer: {
+    marginBottom: 16,
+  },
+  searchLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+    color: '#1A1A1A',
+    letterSpacing: -0.3,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 999,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    shadowColor: '#000000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#111827',
+    paddingVertical: 4,
+  },
+  searchIconButton: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  searchIcon: {
+    fontSize: 20,
   },
   filterSummaryRow: {
     flexDirection: 'row',

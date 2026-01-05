@@ -13,6 +13,7 @@ import { LikesScreen } from '../screens/chat/LikesScreen';
 import { ViewUserProfileScreen } from '../screens/profile/ViewUserProfileScreen';
 import { MyProfileScreen } from '../screens/profile/MyProfileScreen';
 import { ChatScreen } from '../screens/chat/ChatScreen';
+import { SupportCenterScreen } from '../screens/support/SupportCenterScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -24,6 +25,7 @@ export type RootStackParamList = {
   Likes: undefined;
   Matches: undefined;
   MyProfile: undefined;
+  SupportCenter: undefined;
   ViewUserProfile: { userId: string };
   Chat: { matchId: string; otherUserId: string; otherUserName: string; otherUserPhoto?: string | null };
 };
@@ -104,6 +106,11 @@ export const RootNavigator = () => {
             name="MyProfile"
             component={MyProfileScreen}
             options={{ title: 'My profile' }}
+          />
+          <Stack.Screen
+            name="SupportCenter"
+            component={SupportCenterScreen}
+            options={{ title: 'Support center' }}
           />
           <Stack.Screen
             name="ViewUserProfile"

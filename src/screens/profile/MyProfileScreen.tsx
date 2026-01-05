@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Image, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+
 import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
@@ -15,7 +15,7 @@ export type MyProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'M
 const MIN_PHOTOS = 1;
 const MAX_PHOTOS = 3;
 
-export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
+export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) => {
   const { user, profile, refreshProfile, signOut } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -440,7 +440,16 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = () => {
           >
             <Text style={styles.signOutButtonText}>Sign out</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('SupportCenter')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.supportButtonText}>Support Center</Text>
+          </TouchableOpacity>
         </View>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -723,5 +732,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#EF4444',
+  },
+  supportButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  supportButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2563EB',
   },
 });
