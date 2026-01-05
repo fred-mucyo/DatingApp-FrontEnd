@@ -25,6 +25,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
+import { registerForPushNotificationsAsync } from '../../services/notifications';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { getDailySuggestions, SuggestionProfile, sendLike, markProfilePassed } from '../../services/matching';
 import { verifyMatchExists, hasSentPreMatchMessage, sendPreMatchMessage, fetchMatchesWithLastMessage } from '../../services/chat';
@@ -197,7 +198,10 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   useEffect(() => {
     if (!user) return;
-    
+
+    // Register for push notifications once a user is available
+    registerForPushNotificationsAsync().catch(() => {});
+
     // Load immediately on mount
     const loadCached = async () => {
       await loadLikesToday();

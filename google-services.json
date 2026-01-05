@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "835538463498",
+    "project_id": "datingapp-v1-435eb",
+    "storage_bucket": "datingapp-v1-435eb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:835538463498:android:21ecf8ceab1790711668f3",
+        "android_client_info": {
+          "package_name": "com.university.unidatingbeta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCn4DdVuzaccLUB_EYOGNK-IDIkjFJCA6k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

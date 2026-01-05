@@ -22,7 +22,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.university.unidatingbeta"
+      "package": "com.university.unidatingbeta",
+       "googleServicesFile": "./google-services.json"
     },
     "plugins": [
       "expo-font",
