@@ -600,7 +600,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.menuItem, styles.menuItemDestructive]}
+                style={[styles.menuItem, styles.menuItemDestructive, styles.menuItemLast]}
                 onPress={() => {
                   setShowMenu(false);
                   setShowReportModal(true);
@@ -1053,6 +1053,9 @@ const styles = StyleSheet.create({
   },
   menuItemDestructive: {
     borderBottomColor: '#FEE2E2',
+  },
+  menuItemLast: {
+    borderBottomWidth: 0,
   },
   menuItemText: {
     fontSize: 16,

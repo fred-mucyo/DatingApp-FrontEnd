@@ -228,7 +228,6 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
             </View>
             <View style={styles.trailingIndicators}>
               {unread > 0 && <View style={styles.unreadDot} />}
-              <Text style={styles.chevron}>{'>'}</Text>
             </View>
           </View>
         </View>
@@ -242,18 +241,6 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.headerBar}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Text style={styles.headerIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Messages</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
         <View style={styles.statsBar}>
           <Text style={styles.statsText}>{totalMatches} matches</Text>
           <Text style={[styles.statsText, totalUnread > 0 && styles.statsUnreadText]}>
@@ -305,35 +292,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
-  },
-  headerBar: {
-    height: 56,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerIcon: {
-    fontSize: 18,
-    color: '#111827',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  headerSpacer: {
-    width: 32,
   },
   statsBar: {
     flexDirection: 'row',
@@ -437,10 +395,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: '#3B82F6',
     marginRight: 8,
-  },
-  chevron: {
-    fontSize: 18,
-    color: '#D1D5DB',
   },
   messageTicksContainer: {
     flexDirection: 'row',

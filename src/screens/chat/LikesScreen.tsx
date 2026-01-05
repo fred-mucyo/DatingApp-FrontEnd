@@ -253,18 +253,6 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
-        <View style={styles.headerBar}>
-          <TouchableOpacity
-            style={styles.headerButton}
-            activeOpacity={0.8}
-            onPress={() => navigation.navigate('Home')}
-          >
-            <Text style={styles.headerIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Likes</Text>
-          <View style={styles.headerSpacer} />
-        </View>
-
         <View style={styles.contentArea}>
           {loading && !hasLoadedOnce ? (
             <View style={styles.center}>
@@ -293,32 +281,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  headerButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 4,
-  },
-  headerIcon: {
-    fontSize: 20,
-    color: '#1A1A1A',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1A1A1A',
-  },
-  headerSpacer: {
-    width: 24,
   },
   contentArea: {
     flex: 1,
