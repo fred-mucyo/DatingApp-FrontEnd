@@ -41,52 +41,10 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
     }
 
     try {
-      // Try cache first
-      const cached = await cacheService.getLikes(user.id);
-      if (cached && cached.length > 0) {
-        setItems(cached);
-        setHasLoadedOnce(true);
-      }
+      const offset = pageNum * PAGE_SIZE;
+      const data = await fetchIncomingLikes(user.id, PAGE_SIZE, offset);
 
-      const all = await fetchIncomingLikes(user.id);
-      const start = pageNum * PAGE_SIZE;
-      const data = all.slice(start, start + PAGE_SIZE);
-
-      const enriched = await Promise.all(
-        data.map(async (item) => {
-          const hasPhotosArray = Array.isArray(item.profile_photos) && item.profile_photos.length > 0;
-
-          if (hasPhotosArray) {
-            return item;
-          }
-
-          try {
-            const { data: prof, error } = await supabase
-              .from('profiles')
-              .select('photos')
-              .eq('id', item.user_id)
-              .maybeSingle();
-
-            if (
-              !error &&
-              prof &&
-              Array.isArray((prof as any).photos) &&
-              (prof as any).photos.length > 0
-            ) {
-              return {
-                ...item,
-                profile_photos: (prof as any).photos as string[],
-              };
-            }
-          } catch {
-            // ignore enrichment errors and fall back to existing data
-          }
-
-          return item;
-        }),
-      );
-
-      const userIds = enriched.map((item) => item.user_id);
+      const userIds = data.map((item) => item.user_id);
 
       let likedBackUserIds = new Set<string>();
       if (userIds.length > 0) {
@@ -105,14 +63,14 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
         }
       }
 
-      const filtered = enriched.filter((item) => !likedBackUserIds.has(item.user_id));
+      const filtered = data.filter((item) => !likedBackUserIds.has(item.user_id));
 
       if (pageNum === 0) {
         setItems(filtered);
       } else {
         setItems((prev) => [...prev, ...filtered]);
       }
-      setHasMore(filtered.length === PAGE_SIZE);
+      setHasMore(data.length === PAGE_SIZE);
       if (pageNum === 0) {
         await cacheService.setLikes(user.id, filtered);
       }

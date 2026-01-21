@@ -393,7 +393,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: 'Check out this amazing dating app! Download now and find your match.',
+        message: 'Check out this amazing dating app! Download it here : https://hashye.online/mutima-info now and find your match.',
         title: 'Share App',
       });
     } catch (error) {

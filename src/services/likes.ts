@@ -10,12 +10,22 @@ export interface IncomingLikeProfile {
   profile_photos: string[] | null;
 }
 
-export const fetchIncomingLikes = async (currentUserId: string): Promise<IncomingLikeProfile[]> => {
-  const { data, error } = await supabase
+export const fetchIncomingLikes = async (
+  currentUserId: string,
+  limit?: number,
+  offset = 0,
+): Promise<IncomingLikeProfile[]> => {
+  let query = supabase
     .from('likes')
-    .select('id, liker:profiles!likes_liker_id_fkey(id, name, age, city, country, profile_photos)')
+    .select('id, liker:profiles!likes_liker_id_fkey(id, name, age, city, country, profile_photos, photos)')
     .eq('liked_id', currentUserId)
     .order('created_at', { ascending: false });
+
+  if (typeof limit === 'number') {
+    query = query.range(offset, offset + limit - 1);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
 
@@ -28,6 +38,13 @@ export const fetchIncomingLikes = async (currentUserId: string): Promise<Incomin
         return null;
       }
 
+      const rawProfilePhotos = (liker.profile_photos as string[] | null | undefined) ?? null;
+      const rawPhotos = (liker.photos as string[] | null | undefined) ?? null;
+      const resolvedPhotos =
+        (Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0 && rawProfilePhotos) ||
+        (Array.isArray(rawPhotos) && rawPhotos.length > 0 && rawPhotos) ||
+        null;
+
       return {
         like_id: row.id as string,
         user_id: liker.id as string,
@@ -35,7 +52,7 @@ export const fetchIncomingLikes = async (currentUserId: string): Promise<Incomin
         age: (liker.age as number) ?? null,
         city: (liker.city as string) ?? null,
         country: (liker.country as string) ?? null,
-        profile_photos: (liker.profile_photos as string[] | null) ?? null,
+        profile_photos: resolvedPhotos,
       } as IncomingLikeProfile;
     })
     .filter((item): item is IncomingLikeProfile => item !== null);

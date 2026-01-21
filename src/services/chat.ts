@@ -113,10 +113,48 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
   if (error) throw error;
   const matches = (data as any[]) ?? [];
 
+  if (matches.length === 0) return [];
+
+  const matchIds = matches.map((m) => m.id as string).filter(Boolean);
+
+  // Fetch blocks once and filter matches client-side.
+  const { data: blocksRes } = await supabase
+    .from('blocks')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+  const blockedOtherUserIds = new Set<string>();
+  for (const row of (blocksRes as any[]) ?? []) {
+    const blocker = row.blocker_id as string;
+    const blocked = row.blocked_id as string;
+    const otherId = blocker === currentUserId ? blocked : blocker;
+    if (otherId) blockedOtherUserIds.add(otherId);
+  }
+
+  // Fetch a batch of recent messages across all matches. We then pick the newest per match.
+  // This avoids 1 query per match while keeping payload bounded.
+  const messageFetchLimit = Math.min(500, Math.max(50, matchIds.length * 10));
+  const { data: messagesRes } = await supabase
+    .from('messages')
+    .select('match_id, content, created_at, sender_id, delivered_at, read_at')
+    .in('match_id', matchIds)
+    .order('created_at', { ascending: false })
+    .limit(messageFetchLimit);
+
+  const lastMessageByMatchId = new Map<string, any>();
+  for (const msg of (messagesRes as any[]) ?? []) {
+    const mid = msg.match_id as string;
+    if (mid && !lastMessageByMatchId.has(mid)) {
+      lastMessageByMatchId.set(mid, msg);
+    }
+  }
+
   const result: MatchItem[] = [];
 
   for (const m of matches) {
     const other = m.user1_id === currentUserId ? m.user2 : m.user1;
+    if (!other?.id) continue;
+    if (blockedOtherUserIds.has(other.id as string)) continue;
 
     const rawProfilePhotos = other.profile_photos as string[] | null | undefined;
     const rawPhotos = (other as any).photos as string[] | null | undefined;
@@ -125,26 +163,7 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
       (Array.isArray(rawPhotos) && rawPhotos[0]) ||
       null;
 
-    // Skip blocked relationships (either direction)
-    const { data: blocked } = await supabase
-      .from('blocks')
-      .select('id')
-      .or(
-        `and(blocker_id.eq.${currentUserId},blocked_id.eq.${other.id}),and(blocker_id.eq.${other.id},blocked_id.eq.${currentUserId})`,
-      )
-      .limit(1)
-      .maybeSingle();
-
-    if (blocked) continue;
-
-    // fetch last message for this match (include sender_id, delivered_at, read_at for read receipts)
-    const { data: lastMsg } = await supabase
-      .from('messages')
-      .select('id, content, created_at, sender_id, delivered_at, read_at')
-      .eq('match_id', m.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const lastMsg = lastMessageByMatchId.get(m.id as string) ?? null;
 
     result.push({
       id: m.id,
@@ -157,9 +176,9 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
       other_user_photo: otherPhoto,
       last_message_content: lastMsg?.content ?? null,
       last_message_created_at: lastMsg?.created_at ?? null,
-      last_message_sender_id: (lastMsg as any)?.sender_id ?? null,
-      last_message_delivered_at: (lastMsg as any)?.delivered_at ?? null,
-      last_message_read_at: (lastMsg as any)?.read_at ?? null,
+      last_message_sender_id: lastMsg?.sender_id ?? null,
+      last_message_delivered_at: lastMsg?.delivered_at ?? null,
+      last_message_read_at: lastMsg?.read_at ?? null,
     });
   }
 

@@ -66,15 +66,19 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         setMatches(cachedMatches);
         setHasLoadedOnce(true);
         // Calculate unread counts from cached data
+        const keysToRead = cachedMatches
+          .filter((m) => m.last_message_sender_id && m.last_message_sender_id !== user.id)
+          .map((m) => ({ matchId: m.id, key: `${LAST_READ_KEY_PREFIX}${m.id}`, lastAt: m.last_message_created_at }))
+          .filter((x) => !!x.lastAt);
+
+        const reads = await Promise.all(keysToRead.map((x) => AsyncStorage.getItem(x.key)));
+
         const counts: Record<string, number> = {};
-        for (const m of cachedMatches) {
-          const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
-          if (lastMessageFromOther && m.last_message_created_at) {
-            const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
-            const lastRead = await AsyncStorage.getItem(lastKey);
-            if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
-              counts[m.id] = 1;
-            }
+        for (let i = 0; i < keysToRead.length; i += 1) {
+          const m = keysToRead[i];
+          const lastRead = reads[i];
+          if (!lastRead || new Date(lastRead) < new Date(m.lastAt as string)) {
+            counts[m.matchId] = 1;
           }
         }
         setUnreadCounts(counts);
@@ -86,15 +90,19 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
       await cacheService.setMatches(user.id, data);
 
       // Calculate unread counts
+      const keysToRead = data
+        .filter((m) => m.last_message_sender_id && m.last_message_sender_id !== user.id)
+        .map((m) => ({ matchId: m.id, key: `${LAST_READ_KEY_PREFIX}${m.id}`, lastAt: m.last_message_created_at }))
+        .filter((x) => !!x.lastAt);
+
+      const reads = await Promise.all(keysToRead.map((x) => AsyncStorage.getItem(x.key)));
+
       const counts: Record<string, number> = {};
-      for (const m of data) {
-        const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
-        if (lastMessageFromOther && m.last_message_created_at) {
-          const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
-          const lastRead = await AsyncStorage.getItem(lastKey);
-          if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
-            counts[m.id] = 1;
-          }
+      for (let i = 0; i < keysToRead.length; i += 1) {
+        const m = keysToRead[i];
+        const lastRead = reads[i];
+        if (!lastRead || new Date(lastRead) < new Date(m.lastAt as string)) {
+          counts[m.matchId] = 1;
         }
       }
       setUnreadCounts(counts);
@@ -117,15 +125,19 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         setMatches(cached);
         setHasLoadedOnce(true);
         // Calculate unread counts
+        const keysToRead = cached
+          .filter((m) => m.last_message_sender_id && m.last_message_sender_id !== user.id)
+          .map((m) => ({ matchId: m.id, key: `${LAST_READ_KEY_PREFIX}${m.id}`, lastAt: m.last_message_created_at }))
+          .filter((x) => !!x.lastAt);
+
+        const reads = await Promise.all(keysToRead.map((x) => AsyncStorage.getItem(x.key)));
+
         const counts: Record<string, number> = {};
-        for (const m of cached) {
-          const lastMessageFromOther = m.last_message_sender_id && m.last_message_sender_id !== user.id;
-          if (lastMessageFromOther && m.last_message_created_at) {
-            const lastKey = `${LAST_READ_KEY_PREFIX}${m.id}`;
-            const lastRead = await AsyncStorage.getItem(lastKey);
-            if (!lastRead || new Date(lastRead) < new Date(m.last_message_created_at)) {
-              counts[m.id] = 1;
-            }
+        for (let i = 0; i < keysToRead.length; i += 1) {
+          const m = keysToRead[i];
+          const lastRead = reads[i];
+          if (!lastRead || new Date(lastRead) < new Date(m.lastAt as string)) {
+            counts[m.matchId] = 1;
           }
         }
         setUnreadCounts(counts);
