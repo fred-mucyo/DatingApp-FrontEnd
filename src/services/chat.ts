@@ -240,7 +240,7 @@ export const sendPreMatchMessage = async (
   receiverId: string,
   content: string,
 ): Promise<PreMatchMessage> => {
-  const trimmed = content.trim();
+  const trimmed = (content ?? '').trim();
   if (!trimmed) {
     throw new Error('Message cannot be empty.');
   }
@@ -294,7 +294,7 @@ export const sendChatMessage = async (
   matchId: string,
   content: string,
 ): Promise<ChatMessage> => {
-  const trimmed = content.trim();
+  const trimmed = (content ?? '').trim();
   if (!trimmed) throw new Error('Message cannot be empty');
 
   const countToday = await getMessageCountToday(userId);

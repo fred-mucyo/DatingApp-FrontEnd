@@ -26,7 +26,6 @@ export default function App() {
       const data = response.notification.request.content.data as any;
       handleNotificationNavigation(data);
     });
-
     return () => {
       sub.remove();
     };

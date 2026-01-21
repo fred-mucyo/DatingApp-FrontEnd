@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Image, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, Image } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -376,7 +376,7 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
                     style={styles.photoContainer}
                     activeOpacity={0.9}
                   >
-                    <Image source={{ uri }} style={styles.photo} />
+                    <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
                     <View style={styles.removeOverlay}>
                       <Text style={styles.removeText}>✕</Text>
                     </View>

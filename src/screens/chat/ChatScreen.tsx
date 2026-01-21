@@ -8,10 +8,10 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
+  Image,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Image,
   Modal,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -41,6 +41,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [pendingMessages, setPendingMessages] = useState<MessageItem[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [messagesLeft, setMessagesLeft] = useState<number | null>(null);
@@ -233,23 +234,33 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
     }
 
     setSending(true);
+    const optimisticMessage: MessageItem = {
+      id: `optimistic-${Date.now()}`,
+      match_id: matchId,
+      sender_id: user.id,
+      content: input,
+      created_at: new Date().toISOString(),
+      delivered_at: null,
+      read_at: null,
+    };
+    setPendingMessages((prev) => [...prev, optimisticMessage]);
+    setInput('');
+    setTimeout(scrollToBottom, 50);
     try {
-      const newMessage = await sendChatMessage(user.id, matchId, input);
-      setInput('');
+      const newMessage = await sendChatMessage(user.id, matchId, optimisticMessage.content);
+      setPendingMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id));
       if (messagesLeft !== null) {
         setMessagesLeft(Math.max(0, messagesLeft - 1));
       }
-      // Add message immediately to UI (optimistic update)
       setMessages((prev) => {
-        // Avoid duplicates
         if (prev.some((m) => m.id === newMessage.id)) return prev;
         const updated = [...prev, newMessage];
-        // Update cache
         cacheService.setMessages(matchId, updated).catch(() => {});
         return updated;
       });
       setTimeout(scrollToBottom, 50);
     } catch (e: any) {
+      setPendingMessages((prev) => prev.filter((m) => m.id !== optimisticMessage.id));
       Alert.alert('Error', e.message ?? 'Failed to send message');
     } finally {
       setSending(false);
@@ -489,7 +500,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
           ) : (
             <FlatList
               ref={flatListRef}
-              data={messages}
+              data={[...messages, ...pendingMessages]}
               keyExtractor={(item) => item.id}
               renderItem={renderItem}
               contentContainerStyle={styles.listContent}
@@ -497,7 +508,6 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
               showsVerticalScrollIndicator={false}
               onScroll={(event) => {
                 const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-                // Load more when scrolled near top (within 200px from top)
                 if (contentOffset.y < 200 && hasMoreMessages && !loadingMore && messages.length > 0) {
                   loadMoreMessages();
                 }

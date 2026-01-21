@@ -283,7 +283,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             >
               {photos.map((uri, index) => (
                 <View key={uri + index} style={{ width: screenWidth }}>
-                  <Image source={{ uri }} style={styles.mainPhoto} />
+                  <Image source={{ uri }} style={styles.mainPhoto} resizeMode="cover" />
                   {/* Bottom gradient for text readability */}
                   <View style={styles.bottomGradient} />
                 </View>

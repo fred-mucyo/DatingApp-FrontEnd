@@ -1,19 +1,50 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { LoginScreen } from '../screens/auth/LoginScreen';
-import { SignUpScreen } from '../screens/auth/SignUpScreen';
-import { ProfileWizardScreen } from '../screens/profile/ProfileWizardScreen';
-import { HomeScreen } from '../screens/home/HomeScreen';
-import { DiscoveryScreen } from '../screens/discovery/DiscoveryScreen';
-import { ExploreScreen } from '../screens/explore/ExploreScreen';
-import { MatchesScreen } from '../screens/chat/MatchesScreen';
-import { LikesScreen } from '../screens/chat/LikesScreen';
-import { ViewUserProfileScreen } from '../screens/profile/ViewUserProfileScreen';
-import { MyProfileScreen } from '../screens/profile/MyProfileScreen';
-import { ChatScreen } from '../screens/chat/ChatScreen';
-import { SupportCenterScreen } from '../screens/support/SupportCenterScreen';
+
+const LoginScreen = React.lazy(() =>
+  import('../screens/auth/LoginScreen').then((m) => ({ default: m.LoginScreen })),
+);
+const SignUpScreen = React.lazy(() =>
+  import('../screens/auth/SignUpScreen').then((m) => ({ default: m.SignUpScreen })),
+);
+const ProfileWizardScreen = React.lazy(() =>
+  import('../screens/profile/ProfileWizardScreen').then((m) => ({
+    default: m.ProfileWizardScreen,
+  })),
+);
+const HomeScreen = React.lazy(() =>
+  import('../screens/home/HomeScreen').then((m) => ({ default: m.HomeScreen })),
+);
+const DiscoveryScreen = React.lazy(() =>
+  import('../screens/discovery/DiscoveryScreen').then((m) => ({ default: m.DiscoveryScreen })),
+);
+const ExploreScreen = React.lazy(() =>
+  import('../screens/explore/ExploreScreen').then((m) => ({ default: m.default })),
+);
+const MatchesScreen = React.lazy(() =>
+  import('../screens/chat/MatchesScreen').then((m) => ({ default: m.MatchesScreen })),
+);
+const LikesScreen = React.lazy(() =>
+  import('../screens/chat/LikesScreen').then((m) => ({ default: m.LikesScreen })),
+);
+const ViewUserProfileScreen = React.lazy(() =>
+  import('../screens/profile/ViewUserProfileScreen').then((m) => ({
+    default: m.ViewUserProfileScreen,
+  })),
+);
+const MyProfileScreen = React.lazy(() =>
+  import('../screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })),
+);
+const ChatScreen = React.lazy(() =>
+  import('../screens/chat/ChatScreen').then((m) => ({ default: m.ChatScreen })),
+);
+const SupportCenterScreen = React.lazy(() =>
+  import('../screens/support/SupportCenterScreen').then((m) => ({
+    default: m.SupportCenterScreen,
+  })),
+);
 
 export type RootStackParamList = {
   Login: undefined;
@@ -48,7 +79,8 @@ export const RootNavigator = () => {
   }
 
   return (
-    <Stack.Navigator>
+    <Suspense fallback={<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color="#F97316" /></View>}>
+      <Stack.Navigator>
       {!session && (
         <>
           <Stack.Screen
@@ -124,6 +156,7 @@ export const RootNavigator = () => {
           />
         </>
       )}
-    </Stack.Navigator>
+      </Stack.Navigator>
+    </Suspense>
   );
 };

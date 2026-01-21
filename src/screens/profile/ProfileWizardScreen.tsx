@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, FlatList, Image, Alert, ScrollView } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, FlatList, Alert, ScrollView, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { INTEREST_TAGS } from '../../constants/interests';
@@ -296,7 +296,7 @@ export const ProfileWizardScreen: React.FC = () => {
             <View style={styles.photoGrid}>
               {localPhotos.map((uri, index) => (
                 <View key={uri} style={styles.photoContainer}>
-                  <Image source={{ uri }} style={styles.photo} />
+                  <Image source={{ uri }} style={styles.photo} resizeMode="cover" />
                   <TouchableOpacity 
                     style={styles.removeButton}
                     onPress={() => removePhoto(uri)}

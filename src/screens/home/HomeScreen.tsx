@@ -1,3 +1,4 @@
+import { debounce } from 'lodash';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -13,6 +14,7 @@ import {
   Share,
   Dimensions,
   Platform,
+  UIManager,
   Modal,
   TextInput,
   Animated,
@@ -36,6 +38,20 @@ import { cacheService } from '../../services/cache';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 const { width, height } = Dimensions.get('window');
+
+const hasFastImageNativeView = !!(UIManager as any)?.getViewManagerConfig?.('FastImageView');
+
+const fastImageModule: any = hasFastImageNativeView
+  ? (() => {
+      try {
+        return require('react-native-fast-image');
+      } catch {
+        return null;
+      }
+    })()
+  : null;
+
+const FastImageComponent: any = hasFastImageNativeView ? fastImageModule?.default : null;
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { user, profile } = useAuth();
@@ -186,7 +202,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       await cacheService.setSuggestionIndex(user.id, startIndex);
       
       setLocallyLikedIds([]);
-    } catch (e: any) {
+    } catch (e) {
       console.log('HOME getDailySuggestions error:', e);
       if (!cached) {
         Alert.alert('Error', e?.message ?? 'Failed to load suggestions');
@@ -411,46 +427,44 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           });
         } else {
           // Check if pre-match message was sent
-          hasSentPreMatchMessage(user.id, profileId)
-            .then((alreadySent) => {
-              if (alreadySent) {
-                Alert.alert(
-                  'Message sent',
-                  'You already sent a message to this person. You can chat freely once you match.',
-                );
-              } else {
-                setPreMatchTarget(target);
-                setPreMatchMessage('');
-              }
-            })
-            .catch(() => {
-              // If check fails, show pre-match modal
+          hasSentPreMatchMessage(user.id, profileId).then((alreadySent) => {
+            if (alreadySent) {
+              Alert.alert(
+                'Message sent',
+                'You already sent a message to this person. You can chat freely once you match.',
+              );
+            } else {
               setPreMatchTarget(target);
               setPreMatchMessage('');
-            });
+            }
+          });
         }
       })
-      .catch(() => {
-        // If match check fails, show pre-match modal
-        setPreMatchTarget(target);
-        setPreMatchMessage('');
+      .catch((e) => {
+        console.log('HOME handleMessage error:', e);
       });
   };
 
   const handleSendPreMatch = async () => {
-    if (!user || !preMatchTarget) return;
-    if (!preMatchMessage.trim()) {
-      Alert.alert('Message required', 'Please write a short message first.');
+    if (!user || !preMatchTarget) {
+      return;
+    }
+
+    const message = (preMatchMessage ?? '').trim();
+    if (!message) {
+      Alert.alert('Message required', 'Please enter a message before sending.');
       return;
     }
 
     setPreMatchSending(true);
     try {
-      await sendPreMatchMessage(user.id, preMatchTarget.id, preMatchMessage);
+      await sendPreMatchMessage(user.id, preMatchTarget.id, message);
+
       Alert.alert(
         'Message sent',
         `Your message was sent to ${preMatchTarget.name}. You can continue the conversation once you both match.`,
       );
+
       setPreMatchTarget(null);
       setPreMatchMessage('');
     } catch (e: any) {
@@ -711,7 +725,19 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.photoContainer}>
               {primaryPhoto ? (
                 <View style={styles.imageWrapper}>
-                  <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
+                  {FastImageComponent ? (
+                    <FastImageComponent
+                      source={{
+                        uri: primaryPhoto,
+                        priority: fastImageModule?.priority?.normal,
+                        cache: fastImageModule?.cacheControl?.immutable,
+                      }}
+                      style={styles.profilePhoto}
+                      resizeMode={fastImageModule?.resizeMode?.cover}
+                    />
+                  ) : (
+                    <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
+                  )}
                 </View>
               ) : (
                 <View style={[styles.profilePhoto, styles.photoPlaceholder]}>
@@ -817,9 +843,14 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.safeArea}>
       <View style={styles.container}>
         {loadingSuggestions ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#D4AF37" />
-            <Text style={styles.loadingText}>Finding your perfect match...</Text>
+          <View style={styles.skeletonContainer}>
+            {[...Array(2)].map((_, i) => (
+              <View key={i} style={styles.skeletonCard}>
+                <View style={styles.skeletonPhoto} />
+                <View style={styles.skeletonTextRow} />
+                <View style={styles.skeletonTextRowShort} />
+              </View>
+            ))}
           </View>
         ) : suggestions.length === 0 ? (
           <View style={styles.emptyStateContainer}>

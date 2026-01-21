@@ -5,11 +5,11 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Image,
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
   Alert,
+  Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
@@ -25,10 +25,13 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<IncomingLikeProfile[]>([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 20;
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
-  const loadLikes = useCallback(async (showLoading = false) => {
+  const loadLikes = useCallback(async (showLoading = false, pageNum = 0) => {
     if (!user) return;
     
     if (showLoading) {
@@ -45,7 +48,9 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
         setHasLoadedOnce(true);
       }
 
-      const data = await fetchIncomingLikes(user.id);
+      const all = await fetchIncomingLikes(user.id);
+      const start = pageNum * PAGE_SIZE;
+      const data = all.slice(start, start + PAGE_SIZE);
 
       const enriched = await Promise.all(
         data.map(async (item) => {
@@ -102,8 +107,15 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
 
       const filtered = enriched.filter((item) => !likedBackUserIds.has(item.user_id));
 
-      setItems(filtered);
-      await cacheService.setLikes(user.id, filtered);
+      if (pageNum === 0) {
+        setItems(filtered);
+      } else {
+        setItems((prev) => [...prev, ...filtered]);
+      }
+      setHasMore(filtered.length === PAGE_SIZE);
+      if (pageNum === 0) {
+        await cacheService.setLikes(user.id, filtered);
+      }
       setHasLoadedOnce(true);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to load likes');
@@ -116,20 +128,17 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   // Load cached data immediately
   useEffect(() => {
     if (!user) return;
-    
+    setPage(0);
     const loadCached = async () => {
       const cached = await cacheService.getLikes(user.id);
       if (cached && cached.length > 0) {
         setItems(cached);
         setHasLoadedOnce(true);
       } else {
-        // If no cache, show loading
         setLoading(true);
       }
-      // Refresh in background
-      loadLikes(false);
+      loadLikes(false, 0);
     };
-    
     loadCached();
   }, [user, loadLikes]);
 
@@ -137,7 +146,8 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   useFocusEffect(
     useCallback(() => {
       if (user) {
-        loadLikes(false);
+        setPage(0);
+        loadLikes(false, 0);
       }
     }, [user, loadLikes])
   );
@@ -186,7 +196,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
           onPress={() => navigation.navigate('ViewUserProfile', { userId: item.user_id })}
         >
           {photo ? (
-            <Image source={{ uri: photo }} style={styles.avatar} />
+            <Image source={{ uri: photo }} style={styles.avatar} resizeMode="cover" />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]}>
               <Text style={styles.avatarInitial}>
@@ -250,6 +260,14 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
     </View>
   );
 
+  const handleEndReached = () => {
+    if (!loading && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      loadLikes(false, nextPage);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -266,6 +284,14 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
               keyExtractor={(item) => item.like_id}
               renderItem={renderItem}
               contentContainerStyle={styles.listContent}
+              onEndReached={handleEndReached}
+              onEndReachedThreshold={0.5}
+              refreshing={refreshing}
+              onRefresh={() => {
+                setPage(0);
+                loadLikes(true, 0);
+              }}
+              ListFooterComponent={loading && hasLoadedOnce ? <ActivityIndicator size="small" color="#F97316" /> : null}
             />
           )}
         </View>

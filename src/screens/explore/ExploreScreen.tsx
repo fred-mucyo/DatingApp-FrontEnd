@@ -1,138 +1,251 @@
-// import React, { useMemo, useState } from 'react';
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   TextInput,
-//   Button,
-//   FlatList,
-//   TouchableOpacity,
-//   Image,
-//   ActivityIndicator,
-//   SafeAreaView,
-//   ScrollView,
-// } from 'react-native';
-// import { NativeStackScreenProps } from '@react-navigation/native-stack';
-// import type { RootStackParamList } from '../../navigation/RootNavigator';
-// import { useAuth } from '../../context/AuthContext';
-// import { supabase } from '../../config/supabaseClient';
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  ActivityIndicator,
+  Image,
+  SafeAreaView,
+} from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../../navigation/RootNavigator';
+import { useAuth } from '../../context/AuthContext';
+import { supabase } from '../../config/supabaseClient';
 
-// export type ExploreScreenProps = NativeStackScreenProps<RootStackParamList, 'Explore'>;
+type ExploreScreenProps = NativeStackScreenProps<RootStackParamList, 'Explore'>;
 
-// interface ExploreProfile {
-//   id: string;
-//   name: string | null;
-//   age: number | null;
-//   gender: string | null;
-//   city: string | null;
-//   country: string | null;
-//   photos: string[] | null;
-// }
+interface ExploreProfile {
+  id: string;
+  name: string | null;
+  age: number | null;
+  gender: string | null;
+  city: string | null;
+  country: string | null;
+  photos: string[] | null;
+}
 
-// export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
-//   const { user } = useAuth();
-//   const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female' | 'other'>('all');
-//   const [locationFilter, setLocationFilter] = useState('');
-//   const [minAge, setMinAge] = useState('');
-//   const [maxAge, setMaxAge] = useState('');
-//   const [loading, setLoading] = useState(false);
-//   const [profiles, setProfiles] = useState<ExploreProfile[]>([]);
-//   const [info, setInfo] = useState('');
-//   const [filtersOpen, setFiltersOpen] = useState(true);
+const PAGE_SIZE = 10;
+const FETCH_CHUNK_SIZE = 30;
 
-//   const activeFilterCount = useMemo(() => {
-//     let count = 0;
-//     if (genderFilter !== 'all') count += 1;
-//     if (locationFilter.trim()) count += 1;
-//     if (minAge) count += 1;
-//     if (maxAge) count += 1;
-//     return count;
-//   }, [genderFilter, locationFilter, minAge, maxAge]);
+const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
+  const { user, profile } = useAuth();
 
-//   const handleSearch = async () => {
-//     if (!user) return;
+  const [nameFilter, setNameFilter] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [profiles, setProfiles] = useState<ExploreProfile[]>([]);
+  const [info, setInfo] = useState('');
+  const [hasMore, setHasMore] = useState(true);
+  const [fetchOffset, setFetchOffset] = useState(0);
 
-//     setLoading(true);
-//     setInfo('');
-//     try {
-//       let query = supabase
-//         .from('profiles')
-//         .select('id, name, age, gender, city, country, photos')
-//         .eq('is_complete', true)
-//         .neq('id', user.id)
-//         .limit(50);
+  const baseQuery = () => {
+    if (!user) return null;
+    let query = supabase
+      .from('profiles')
+      .select('id, name, age, gender, city, country, photos')
+      .eq('is_complete', true)
+      .neq('id', user.id)
+      .order('created_at', { ascending: false });
 
-//       if (genderFilter !== 'all') {
-//         query = query.eq('gender', genderFilter);
-//       }
+    if (nameFilter.trim()) {
+      const name = nameFilter.trim();
+      query = query.ilike('name', `%${name}%`);
+    }
 
-//       if (locationFilter.trim()) {
-//         const loc = locationFilter.trim();
-//         query = query.or(`city.ilike.%${loc}%,country.ilike.%${loc}%`);
-//       }
+    return query;
+  };
 
-//       if (minAge) {
-//         query = query.gte('age', Number(minAge));
-//       }
-//       if (maxAge) {
-//         query = query.lte('age', Number(maxAge));
-//       }
+  const handleSearch = async (reset = true) => {
+    if (!user) return;
+    setLoading(true);
+    setInfo('');
+    try {
+      const preferredGender = profile?.gender_preference;
 
-//       const { data, error } = await query;
-//       if (error) {
-//         setInfo(error.message);
-//         setProfiles([]);
-//         return;
-//       }
+      if (reset) {
+        setProfiles([]);
+        setFetchOffset(0);
+      }
 
-//       setProfiles((data as ExploreProfile[]) ?? []);
-//       if (!data || data.length === 0) {
-//         setInfo('No profiles found with these filters.');
-//       }
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+      if (reset && preferredGender && preferredGender !== 'all') {
+        const queryPreferred = baseQuery()?.eq('gender', preferredGender);
+        const queryOther = baseQuery()?.neq('gender', preferredGender);
 
-//   const renderItem = ({ item }: { item: ExploreProfile }) => {
-//     const mainPhoto = item.photos && item.photos[0];
-//     return (
-//       <TouchableOpacity
-//         style={styles.card}
-//         onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
-//         activeOpacity={0.7}
-//       >
-//         {mainPhoto ? (
-//           <Image source={{ uri: mainPhoto }} style={styles.photo} />
-//         ) : (
-//           <View style={styles.photoPlaceholder}>
-//             <Text style={styles.placeholderIcon}>👤</Text>
-//           </View>
-//         )}
-//         <View style={styles.cardGradient} />
-//         <View style={styles.cardInfo}>
-//           <Text style={styles.name} numberOfLines={1}>
-//             {item.name ?? 'Unknown'}
-//             {item.age ? `, ${item.age}` : ''}
-//           </Text>
-//           {(!!item.city || !!item.country) && (
-//             <View style={styles.locationRow}>
-//               <Text style={styles.locationIcon}>📍</Text>
-//               <Text style={styles.meta} numberOfLines={1}>
-//                 {[item.city, item.country].filter(Boolean).join(', ')}
-//               </Text>
-//             </View>
-//           )}
-//         </View>
-//       </TouchableOpacity>
-//     );
-//   };
+        if (!queryPreferred || !queryOther) {
+          setHasMore(false);
+          return;
+        }
 
-//   return (
-//     <SafeAreaView style={styles.safeArea}>
-//       <View style={styles.container}>
-//         <View style={styles.headerBar}>
-//           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
+        const [{ data: prefData, error: prefErr }, { data: otherData, error: otherErr }] =
+          await Promise.all([
+            queryPreferred.limit(PAGE_SIZE).range(0, PAGE_SIZE - 1),
+            queryOther.limit(PAGE_SIZE).range(0, PAGE_SIZE - 1),
+          ]);
+
+        if (prefErr) {
+          setInfo(prefErr.message);
+          setProfiles([]);
+          setHasMore(false);
+          return;
+        }
+        if (otherErr) {
+          setInfo(otherErr.message);
+          setProfiles([]);
+          setHasMore(false);
+          return;
+        }
+
+        const pref = ((prefData as ExploreProfile[]) ?? []).slice(0, PAGE_SIZE);
+        const remainder = PAGE_SIZE - pref.length;
+
+        const otherRaw = (otherData as ExploreProfile[]) ?? [];
+        const other = otherRaw.filter((p) => !pref.some((x) => x.id === p.id)).slice(0, remainder);
+
+        const merged = [...pref, ...other];
+
+        setProfiles(merged);
+        setHasMore(merged.length === PAGE_SIZE && (pref.length === PAGE_SIZE || otherRaw.length > 0));
+        if (merged.length === 0) {
+          setInfo('No profiles found.');
+        }
+        return;
+      }
+
+      const query = baseQuery();
+      if (!query) {
+        setHasMore(false);
+        return;
+      }
+
+      const rangeStart = reset ? 0 : fetchOffset;
+      const rangeEnd = rangeStart + FETCH_CHUNK_SIZE - 1;
+      const { data, error } = await query.range(rangeStart, rangeEnd);
+      if (error) {
+        setInfo(error.message);
+        if (reset) setProfiles([]);
+        setHasMore(false);
+        return;
+      }
+
+      const raw = (data as ExploreProfile[]) ?? [];
+      const unique = raw.filter((p) => !profiles.some((x) => x.id === p.id));
+      const nextBatch = unique.slice(0, PAGE_SIZE);
+
+      const nextProfiles = reset ? nextBatch : [...profiles, ...nextBatch];
+      setProfiles(nextProfiles);
+      setFetchOffset(rangeStart + raw.length);
+      setHasMore(nextBatch.length === PAGE_SIZE && raw.length > 0);
+
+      if (reset && nextProfiles.length === 0) {
+        setInfo('No profiles found.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || !profile) return;
+    handleSearch(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, profile?.gender_preference]);
+
+  const renderItem = ({ item }: { item: ExploreProfile }) => {
+    const mainPhoto = item.photos && item.photos[0];
+    return (
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
+        activeOpacity={0.8}
+      >
+        {mainPhoto ? (
+          <Image source={{ uri: mainPhoto }} style={styles.photo} resizeMode="cover" />
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.placeholderIcon}>👤</Text>
+          </View>
+        )}
+        <View style={styles.cardOverlay} />
+        <View style={styles.cardInfo}>
+          <Text style={styles.name} numberOfLines={1}>
+            {item.name ?? 'Unknown'}
+            {item.age ? `, ${item.age}` : ''}
+          </Text>
+          {(!!item.city || !!item.country) && (
+            <View style={styles.locationRow}>
+              <Text style={styles.locationIcon}>📍</Text>
+              <Text style={styles.meta} numberOfLines={1}>
+                {[item.city, item.country].filter(Boolean).join(', ')}
+              </Text>
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <FlatList
+          data={profiles}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={[styles.scrollContent, styles.listContent]}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.searchBarContainer}>
+                <View style={styles.searchBar}>
+                  <TextInput
+                    style={styles.searchInput}
+                    placeholder="Search by name..."
+                    placeholderTextColor="#9CA3AF"
+                    value={nameFilter}
+                    onChangeText={setNameFilter}
+                    returnKeyType="search"
+                    onSubmitEditing={() => handleSearch(true)}
+                  />
+                  <TouchableOpacity
+                    onPress={() => handleSearch(true)}
+                    activeOpacity={0.8}
+                    style={styles.searchIconButton}
+                  >
+                    <Text style={styles.searchIcon}>🔍</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {!!info && (
+                <View style={styles.infoContainer}>
+                  <Text style={styles.info}>{info}</Text>
+                </View>
+              )}
+            </View>
+          }
+          ListFooterComponent={
+            <View>
+              {loading ? <ActivityIndicator size="small" color="#F97316" /> : null}
+              {!loading && hasMore && profiles.length > 0 && (
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  onPress={() => handleSearch(false)}
+                  style={styles.applyButton}
+                >
+                  <Text style={styles.applyButtonText}>Show more</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          }
+        />
+      </View>
+    </SafeAreaView>
+  );
+};
+
+export default ExploreScreen;
 //             <View style={styles.backIconCircle}>
 //               <Text style={styles.headerBack}>←</Text>
 //             </View>
@@ -276,16 +389,24 @@
 //               <Text style={styles.info}>{info}</Text>
 //             </View>
 //           )}
-
-//           <FlatList
-//             data={profiles}
-//             keyExtractor={(item) => item.id}
-//             renderItem={renderItem}
-//             contentContainerStyle={styles.listContent}
-//             numColumns={2}
-//             columnWrapperStyle={styles.columnWrapper}
-//             scrollEnabled={false}
-//           />
+//..............
+          // <FlatList
+          //   data={profiles}
+          //   keyExtractor={(item) => item.id}
+          //   renderItem={renderItem}
+          //   contentContainerStyle={styles.listContent}
+          //   numColumns={2}
+          //   columnWrapperStyle={styles.columnWrapper}
+          //   onEndReached={() => {
+          //     if (hasMore && !loading) {
+          //       setPage((prev) => prev + 1);
+          //       handleSearch(false);
+          //     }
+          //   }}
+          //   onEndReachedThreshold={0.5}
+          //   scrollEnabled={true}
+          //   ListFooterComponent={loading ? <ActivityIndicator size="small" color="#EC4899" /> : null}
+          // />
 //         </ScrollView>
 //       </View>
 //     </SafeAreaView>
@@ -624,318 +745,6 @@
 //     letterSpacing: -0.2,
 //   },
 // });
-
-
-
-
-
-
-
-
-
-
-
-
-import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  Button,
-  FlatList,
-  TouchableOpacity,
-  Image,
-  ActivityIndicator,
-  SafeAreaView,
-  ScrollView,
-} from 'react-native';
-import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../navigation/RootNavigator';
-import { useAuth } from '../../context/AuthContext';
-import { supabase } from '../../config/supabaseClient';
-
-export type ExploreScreenProps = NativeStackScreenProps<RootStackParamList, 'Explore'>;
-
-interface ExploreProfile {
-  id: string;
-  name: string | null;
-  age: number | null;
-  gender: string | null;
-  city: string | null;
-  country: string | null;
-  photos: string[] | null;
-}
-
-export const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
-  const { user } = useAuth();
-  const [genderFilter, setGenderFilter] = useState<'all' | 'male' | 'female' | 'other'>('all');
-  const [locationFilter, setLocationFilter] = useState('');
-  const [nameFilter, setNameFilter] = useState('');
-  const [minAge, setMinAge] = useState('');
-  const [maxAge, setMaxAge] = useState('');
-
-  const [loading, setLoading] = useState(false);
-  const [profiles, setProfiles] = useState<ExploreProfile[]>([]);
-  const [info, setInfo] = useState('');
-  const [filtersOpen, setFiltersOpen] = useState(true);
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (genderFilter !== 'all') count += 1;
-    if (locationFilter.trim()) count += 1;
-    if (minAge) count += 1;
-    if (maxAge) count += 1;
-    return count;
-  }, [genderFilter, locationFilter, minAge, maxAge]);
-
-  const handleSearch = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    setInfo('');
-    try {
-      let query = supabase
-        .from('profiles')
-        .select('id, name, age, gender, city, country, photos')
-
-        .eq('is_complete', true)
-        .neq('id', user.id)
-        .limit(50);
-
-      if (genderFilter !== 'all') {
-        query = query.eq('gender', genderFilter);
-      }
-
-      if (locationFilter.trim()) {
-        const loc = locationFilter.trim();
-        query = query.or(`city.ilike.%${loc}%,country.ilike.%${loc}%`);
-      }
-
-      if (nameFilter.trim()) {
-        const name = nameFilter.trim();
-        query = query.ilike('name', `%${name}%`);
-      }
-
-      if (minAge) {
-        query = query.gte('age', Number(minAge));
-      }
-      if (maxAge) {
-        query = query.lte('age', Number(maxAge));
-      }
-
-      const { data, error } = await query;
-      if (error) {
-        setInfo(error.message);
-        setProfiles([]);
-        return;
-      }
-
-      setProfiles((data as ExploreProfile[]) ?? []);
-      if (!data || data.length === 0) {
-        setInfo('No profiles found with these filters.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const renderItem = ({ item }: { item: ExploreProfile }) => {
-    const mainPhoto = item.photos && item.photos[0];
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
-        activeOpacity={0.8}
-      >
-        {mainPhoto ? (
-          <Image source={{ uri: mainPhoto }} style={styles.photo} />
-        ) : (
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.placeholderIcon}>👤</Text>
-          </View>
-        )}
-        <View style={styles.cardOverlay} />
-        <View style={styles.cardInfo}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name ?? 'Unknown'}
-            {item.age ? `, ${item.age}` : ''}
-          </Text>
-          {(!!item.city || !!item.country) && (
-            <View style={styles.locationRow}>
-              <Text style={styles.locationIcon}>📍</Text>
-              <Text style={styles.meta} numberOfLines={1}>
-                {[item.city, item.country].filter(Boolean).join(', ')}
-              </Text>
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <View style={styles.searchBarContainer}>
-            <View style={styles.searchBar}>
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by name..."
-                placeholderTextColor="#9CA3AF"
-                value={nameFilter}
-                onChangeText={setNameFilter}
-                returnKeyType="search"
-                onSubmitEditing={handleSearch}
-              />
-              <TouchableOpacity
-                onPress={handleSearch}
-                activeOpacity={0.8}
-                style={styles.searchIconButton}
-              >
-                <Text style={styles.searchIcon}>🔍</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View style={styles.filterSummaryRow}>
-            <View style={styles.filterChipsRow}>
-              {genderFilter !== 'all' && (
-                <View style={styles.summaryChip}>
-                  <Text style={styles.summaryChipText}>{genderFilter}</Text>
-                </View>
-              )}
-              {!!locationFilter.trim() && (
-                <View style={styles.summaryChip}>
-                  <Text style={styles.summaryChipText}>{locationFilter.trim()}</Text>
-                </View>
-              )}
-              {(minAge || maxAge) && (
-                <View style={styles.summaryChip}>
-                  <Text style={styles.summaryChipText}>
-                    Age {minAge || '18'}-{maxAge || '80+'}
-                  </Text>
-                </View>
-              )}
-              {activeFilterCount === 0 && (
-                <Text style={styles.summaryPlaceholder}>No filters applied</Text>
-              )}
-            </View>
-            <TouchableOpacity onPress={() => setFiltersOpen((prev) => !prev)}>
-            </TouchableOpacity>
-          </View>
-
-          {filtersOpen && (
-            <View style={styles.filterCard}>
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Show me</Text>
-                <View style={styles.chipRow}>
-                  {(['all', 'male', 'female', 'other'] as const).map((g) => (
-                    <TouchableOpacity
-                      key={g}
-                      style={[styles.chip, genderFilter === g && styles.chipSelected]}
-                      onPress={() => setGenderFilter(g)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={genderFilter === g ? styles.chipTextSelected : styles.chipText}>
-                        {g.charAt(0).toUpperCase() + g.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.filterSection}>
-                <Text style={styles.filterLabel}>Location</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="City or country..."
-                  placeholderTextColor="#9CA3AF"
-                  value={locationFilter}
-                  onChangeText={setLocationFilter}
-                />
-                <Text style={styles.helperText}>Partial matches work too.</Text>
-              </View>
-
-              <View style={styles.filterSectionRow}>
-                <View style={styles.filterColumnHalf}>
-                  <Text style={styles.filterLabel}>Min age</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    placeholder="18"
-                    placeholderTextColor="#9CA3AF"
-                    value={minAge}
-                    onChangeText={setMinAge}
-                  />
-                </View>
-                <View style={styles.filterColumnHalfLast}>
-                  <Text style={styles.filterLabel}>Max age</Text>
-                  <TextInput
-                    style={styles.input}
-                    keyboardType="number-pad"
-                    placeholder="80"
-                    placeholderTextColor="#9CA3AF"
-                    value={maxAge}
-                    onChangeText={setMaxAge}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.filterActionsRow}>
-                <TouchableOpacity
-                  onPress={() => {
-                    setGenderFilter('all');
-                    setLocationFilter('');
-                    setNameFilter('');
-                    setMinAge('');
-                    setMaxAge('');
-                  }}
-                  style={styles.clearButton}
-                >
-                  <Text style={styles.clearAllText}>Clear all</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSearch}
-                  disabled={loading}
-                  style={[styles.applyButton, loading && styles.applyButtonDisabled]}
-                >
-                  <Text style={styles.applyButtonText}>
-                    {loading ? 'Searching...' : 'Apply filters'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {loading && (
-            <View style={styles.loadingRow}>
-              <ActivityIndicator size="large" color="#F97316" />
-              <Text style={styles.loadingText}>Finding profiles...</Text>
-            </View>
-          )}
-
-          {!!info && (
-            <View style={styles.infoContainer}>
-              <Text style={styles.info}>{info}</Text>
-            </View>
-          )}
-
-          <FlatList
-            data={profiles}
-            keyExtractor={(item) => item.id}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            numColumns={2}
-            columnWrapperStyle={styles.columnWrapper}
-            scrollEnabled={false}
-          />
-        </ScrollView>
-      </View>
-    </SafeAreaView>
-  );
-};
 
 const styles = StyleSheet.create({
   safeArea: {
