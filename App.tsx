@@ -54,13 +54,13 @@ export default function App() {
     }
   };
   const linking = {
-  prefixes: [Linking.createURL('/')],
-  config: {
-    screens: {
-      ResetPassword: 'reset-password',
+    prefixes: [Linking.createURL('/'), 'mutima://', 'exp://'],
+    config: {
+      screens: {
+        ResetPassword: 'reset-password',
+      },
     },
-  },
-};
+  };
 
   // If the font hasn't loaded yet, we still render the app.
   // Text using Montserrat_900Black will temporarily fall back to the system font.

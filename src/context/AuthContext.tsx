@@ -5,6 +5,7 @@ import { supabase } from '../config/supabaseClient';
 import { Profile } from '../types/profile';
 import { cacheService } from '../services/cache';
 import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
@@ -187,15 +188,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPasswordForEmail = async (email: string) => {
+    const path = 'reset-password';
+    const hostUri =
+      (Constants.expoConfig as any)?.hostUri ??
+      (Constants as any)?.manifest2?.extra?.expoClient?.hostUri ??
+      (Constants as any)?.manifest?.hostUri;
 
-const redirectTo = Linking.createURL('reset-password');
+    const normalizedHostUri =
+      typeof hostUri === 'string' && hostUri.includes('://') ? hostUri.split('://')[1] : hostUri;
 
-const { error } = await supabase.auth.resetPasswordForEmail(email, {
-  redirectTo,
-});
+    const redirectTo =
+      Constants.appOwnership === 'expo' && typeof normalizedHostUri === 'string' && normalizedHostUri
+        ? `exp://${normalizedHostUri}/--/${path}`
+        : Linking.createURL(path);
 
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo,
+    });
 
-  if (error) {
+    if (error) {
       Alert.alert('Password reset error', error.message);
       throw error;
     }

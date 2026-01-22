@@ -55,55 +55,90 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ naviga
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [ready, setReady] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+
+  const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
+    let timeoutId: any;
+    const timeoutPromise = new Promise<T>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error(message)), ms);
+    });
+    try {
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
 
   useEffect(() => {
     const initFromUrl = async (url: string | null) => {
-      if (!url) {
-        setReady(true);
-        return;
-      }
-
-      const hashParams = parseHashParams(url);
-      const queryParams = parseQueryParams(url);
-
-      const linkError =
-        hashParams.error_description ||
-        hashParams.error ||
-        queryParams.error_description ||
-        queryParams.error;
-      if (linkError) {
-        Alert.alert('Recovery link error', String(linkError));
-        setReady(true);
-        return;
-      }
-
-      // PKCE flow (recommended by Supabase): ?code=...
-      const code = queryParams.code;
-      if (code) {
-        try {
-          const { error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) Alert.alert('Recovery error', error.message);
-        } catch (e: any) {
-          Alert.alert('Recovery error', e?.message ?? 'Failed to exchange recovery code');
+      setInitError(null);
+      try {
+        if (!url) {
+          setInitError('Missing recovery URL. Please open the latest reset link from your email.');
+          return;
         }
-        setReady(true);
-        return;
-      }
 
-      // Implicit flow: #access_token=...&refresh_token=...&type=recovery
-      const type = hashParams.type;
-      const access_token = hashParams.access_token;
-      const refresh_token = hashParams.refresh_token;
+        const hashParams = parseHashParams(url);
+        const queryParams = parseQueryParams(url);
 
-      if (type === 'recovery' && access_token && refresh_token) {
-        try {
-          await supabase.auth.setSession({ access_token, refresh_token });
-        } catch (e: any) {
-          Alert.alert('Recovery error', e?.message ?? 'Failed to open recovery session');
+        const linkError =
+          hashParams.error_description ||
+          hashParams.error ||
+          queryParams.error_description ||
+          queryParams.error;
+        if (linkError) {
+          setInitError(String(linkError));
+          Alert.alert('Recovery link error', String(linkError));
+          return;
         }
-      }
 
-      setReady(true);
+        // PKCE flow (recommended by Supabase): ?code=...
+        const code = queryParams.code;
+        if (code) {
+          try {
+            const { error } = await withTimeout(
+              supabase.auth.exchangeCodeForSession(code),
+              12000,
+              'Timed out while exchanging recovery code. Please check your internet connection and try again.',
+            );
+            if (error) {
+              setInitError(error.message);
+              Alert.alert('Recovery error', error.message);
+            }
+          } catch (e: any) {
+            const msg = e?.message ?? 'Failed to exchange recovery code';
+            setInitError(msg);
+            Alert.alert('Recovery error', msg);
+          }
+          return;
+        }
+
+        // Implicit flow: #access_token=...&refresh_token=...&type=recovery
+        const type = hashParams.type;
+        const access_token = hashParams.access_token;
+        const refresh_token = hashParams.refresh_token;
+
+        if (type === 'recovery' && access_token && refresh_token) {
+          try {
+            await withTimeout(
+              supabase.auth.setSession({ access_token, refresh_token }),
+              12000,
+              'Timed out while opening recovery session. Please try again.',
+            );
+          } catch (e: any) {
+            const msg = e?.message ?? 'Failed to open recovery session';
+            setInitError(msg);
+            Alert.alert('Recovery error', msg);
+          }
+          return;
+        }
+
+        setInitError(
+          'This reset link does not contain a valid recovery code. Please request a new password reset email.',
+        );
+      } finally {
+        setReady(true);
+      }
     };
 
     Linking.getInitialURL().then((url) => {
@@ -157,6 +192,9 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ naviga
           </View>
         ) : (
           <>
+            {!!initError && (
+              <Text style={styles.errorText}>{initError}</Text>
+            )}
             <TextInput
               style={styles.input}
               placeholder="New password"
@@ -220,6 +258,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#111827',
     marginBottom: 12,
+  },
+  errorText: {
+    color: '#B91C1C',
+    textAlign: 'center',
+    marginBottom: 12,
+    fontSize: 14,
+    fontWeight: '500',
   },
   button: {
     backgroundColor: '#F97316',
