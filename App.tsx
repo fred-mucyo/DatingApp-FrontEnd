@@ -8,6 +8,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import * as Notifications from 'expo-notifications';
 import { navigationRef } from './src/navigation/navigationRef';
+import * as Linking from 'expo-linking';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -52,13 +53,21 @@ export default function App() {
       });
     }
   };
+  const linking = {
+  prefixes: [Linking.createURL('/')],
+  config: {
+    screens: {
+      ResetPassword: 'reset-password',
+    },
+  },
+};
 
   // If the font hasn't loaded yet, we still render the app.
   // Text using Montserrat_900Black will temporarily fall back to the system font.
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <NavigationContainer ref={navigationRef}>
+      <NavigationContainer ref={navigationRef} linking={linking}>
           <RootNavigator />
           <StatusBar style="dark" />
         </NavigationContainer>

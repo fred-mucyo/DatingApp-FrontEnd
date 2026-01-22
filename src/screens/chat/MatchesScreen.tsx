@@ -212,13 +212,17 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         onPress={() => handleOpenChat(item)}
         activeOpacity={0.8}
       >
-        <View style={styles.avatarWrapper}>
+        <TouchableOpacity
+          style={styles.avatarWrapper}
+          activeOpacity={0.85}
+          onPress={() => navigation.navigate('ViewUserProfile', { userId: item.other_user_id })}
+        >
           {item.other_user_photo ? (
             <Image source={{ uri: item.other_user_photo }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]} />
           )}
-        </View>
+        </TouchableOpacity>
 
         <View style={styles.cardContent}>
           <View style={styles.cardTopRow}>

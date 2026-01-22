@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, FlatList, Button, StyleSheet, ActivityIndicator, Alert, Image } from 'react-native';
+import { View, Text, FlatList, Button, StyleSheet, ActivityIndicator, Alert, Image, TouchableOpacity } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
@@ -16,7 +16,7 @@ interface LikesTodayState {
   count: number;
 }
 
-export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = () => {
+export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<SuggestionProfile[]>([]);
@@ -109,7 +109,14 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = () => {
     const photo = item.profile_photos?.[0];
     return (
       <View style={styles.card}>
-        {photo ? <Image source={{ uri: photo }} style={styles.photo} /> : null}
+        {photo ? (
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
+          >
+            <Image source={{ uri: photo }} style={styles.photo} />
+          </TouchableOpacity>
+        ) : null}
         <Text style={styles.name}>
           {item.name}, {item.age}
         </Text>

@@ -12,13 +12,14 @@ import {
   Dimensions,
   Modal,
   Share,
+  TextInput,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { supabase } from '../../config/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { sendLike } from '../../services/matching';
-import { verifyMatchExists } from '../../services/chat';
+import { hasSentPreMatchMessage, sendPreMatchMessage, verifyMatchExists } from '../../services/chat';
 import { cacheService } from '../../services/cache';
 
 export type ViewUserProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'ViewUserProfile'>;
@@ -48,6 +49,9 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   const [hasMatch, setHasMatch] = useState(false);
   const [menuVisible, setMenuVisible] = useState(false);
   const [likeMatchModalVisible, setLikeMatchModalVisible] = useState(false);
+  const [preMatchVisible, setPreMatchVisible] = useState(false);
+  const [preMatchMessage, setPreMatchMessage] = useState('');
+  const [preMatchSending, setPreMatchSending] = useState(false);
   const [myInterests, setMyInterests] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -88,18 +92,22 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
           Promise.all([
             verifyMatchExists(user.id, userId).then((match) => {
               setHasMatch(!!match);
-            }).catch(() => {}),
-            supabase
-              .from('profiles')
-              .select('interests')
-              .eq('id', user.id)
-              .maybeSingle()
-              .then(({ data: me, error: meErr }) => {
+            }),
+            (async () => {
+              try {
+                const { data: me, error: meErr } = await supabase
+                  .from('profiles')
+                  .select('interests')
+                  .eq('id', user.id)
+                  .maybeSingle();
+
                 if (!meErr && me && Array.isArray((me as any).interests)) {
                   setMyInterests(((me as any).interests as string[]).filter(Boolean));
                 }
-              })
-              .catch(() => {}),
+              } catch {
+                // ignore
+              }
+            })(),
           ]);
         }
       } catch (error) {
@@ -159,6 +167,70 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
     }
   };
 
+  const handleOpenPreMatchComposer = async () => {
+    if (!user) return;
+    if (user.id === userId) {
+      Alert.alert('Info', 'You cannot message yourself.');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const match = await verifyMatchExists(user.id, userId);
+      if (match) {
+        navigation.navigate('Chat', {
+          matchId: match.id,
+          otherUserId: match.other_user_id,
+          otherUserName: match.other_user_name,
+          otherUserPhoto: match.other_user_photo ?? undefined,
+        });
+        return;
+      }
+
+      const alreadySent = await hasSentPreMatchMessage(user.id, userId);
+      if (alreadySent) {
+        Alert.alert(
+          'Message sent',
+          'You already sent a message to this person. You can chat freely once you match.',
+        );
+        return;
+      }
+
+      setPreMatchMessage('');
+      setPreMatchVisible(true);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to open message composer');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleSendPreMatch = async () => {
+    if (!user) return;
+    if (user.id === userId) return;
+
+    const message = (preMatchMessage ?? '').trim();
+    if (!message) {
+      Alert.alert('Message required', 'Please enter a message before sending.');
+      return;
+    }
+
+    setPreMatchSending(true);
+    try {
+      await sendPreMatchMessage(user.id, userId, message);
+      Alert.alert(
+        'Message sent',
+        `Your message was sent to ${displayName}. You can continue the conversation once you both match.`,
+      );
+      setPreMatchVisible(false);
+      setPreMatchMessage('');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to send message');
+    } finally {
+      setPreMatchSending(false);
+    }
+  };
+
   const handleShareProfile = async () => {
     if (!profile) return;
     try {
@@ -169,6 +241,34 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
       });
     } catch {
       // ignore share errors
+    }
+  };
+
+  const handleStartChat = async () => {
+    if (!user) return;
+    if (user.id === userId) {
+      Alert.alert('Info', 'You cannot start a chat with yourself.');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      const match = await verifyMatchExists(user.id, userId);
+      if (!match) {
+        Alert.alert('No match yet', 'You can start a chat after you both like each other.');
+        return;
+      }
+
+      navigation.navigate('Chat', {
+        matchId: match.id,
+        otherUserId: match.other_user_id,
+        otherUserName: match.other_user_name,
+        otherUserPhoto: match.other_user_photo ?? undefined,
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to open chat');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -239,34 +339,6 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
     profile.interests && myInterests.length > 0
       ? profile.interests.filter((i) => myInterests.includes(i)).slice(0, 4)
       : [];
-
-  const handleStartChat = async () => {
-    if (!user) return;
-    if (user.id === userId) {
-      Alert.alert('Info', 'You cannot start a chat with yourself.');
-      return;
-    }
-
-    setActionLoading(true);
-    try {
-      const match = await verifyMatchExists(user.id, userId);
-      if (!match) {
-        Alert.alert('No match yet', 'You can start a chat after you both like each other.');
-        return;
-      }
-
-      navigation.navigate('Chat', {
-        matchId: match.id,
-        otherUserId: match.other_user_id,
-        otherUserName: match.other_user_name,
-        otherUserPhoto: match.other_user_photo ?? undefined,
-      });
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to open chat');
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -413,6 +485,14 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
                 <Text style={styles.passButtonText}>✕</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                style={styles.messageButton}
+                activeOpacity={0.9}
+                onPress={handleOpenPreMatchComposer}
+                disabled={actionLoading}
+              >
+                <Text style={styles.messageButtonText}>💬</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.primaryButton}
                 activeOpacity={0.9}
                 onPress={handleLike}
@@ -423,6 +503,58 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             </View>
           )}
         </View>
+
+        <Modal
+          transparent
+          animationType="slide"
+          visible={preMatchVisible}
+          onRequestClose={() => {
+            if (!preMatchSending) {
+              setPreMatchVisible(false);
+              setPreMatchMessage('');
+            }
+          }}
+        >
+          <View style={styles.preMatchBackdrop}>
+            <View style={styles.preMatchCard}>
+              <Text style={styles.preMatchTitle}>Message {displayName}</Text>
+              <Text style={styles.preMatchSubtitle}>
+                You can send one message before you match. Make it count.
+              </Text>
+
+              <TextInput
+                style={styles.preMatchInput}
+                multiline
+                placeholder="Say hi..."
+                placeholderTextColor="#9CA3AF"
+                value={preMatchMessage}
+                onChangeText={(text) => {
+                  if (text.length <= 500) setPreMatchMessage(text);
+                }}
+              />
+
+              <View style={styles.preMatchActionsRow}>
+                <TouchableOpacity
+                  style={[styles.preMatchButton, styles.preMatchCancelButton]}
+                  onPress={() => {
+                    if (preMatchSending) return;
+                    setPreMatchVisible(false);
+                    setPreMatchMessage('');
+                  }}
+                >
+                  <Text style={styles.preMatchCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.preMatchButton, styles.preMatchSendButton]}
+                  onPress={handleSendPreMatch}
+                  disabled={preMatchSending}
+                >
+                  <Text style={styles.preMatchSendText}>{preMatchSending ? 'Sending…' : 'Send'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
 
         {/* Menu modal */}
         <Modal
@@ -546,7 +678,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: 320,
     backgroundColor: 'transparent',
-    background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.9))',
   },
   topBar: {
     position: 'absolute',
@@ -565,7 +696,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
-    backdropFilter: 'blur(10px)',
   },
   topBarIcon: {
     color: '#FFFFFF',
@@ -650,7 +780,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     marginBottom: 10,
     alignSelf: 'flex-start',
-    backdropFilter: 'blur(10px)',
   },
   statItem: {
     flexDirection: 'row',
@@ -676,7 +805,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    backdropFilter: 'blur(10px)',
   },
   bioText: {
     fontSize: 14,
@@ -691,7 +819,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: 10,
-    backdropFilter: 'blur(10px)',
   },
   sharedLabel: {
     fontSize: 13,
@@ -715,7 +842,6 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     backgroundColor: 'rgba(249, 115, 22, 0.25)',
-    backdropFilter: 'blur(10px)',
   },
   interestTextCompact: {
     fontSize: 12,
@@ -731,7 +857,6 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
     paddingTop: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    backdropFilter: 'blur(20px)',
   },
   bottomButtonsRow: {
     flexDirection: 'row',
@@ -753,6 +878,19 @@ const styles = StyleSheet.create({
     color: '#EF4444',
     fontWeight: '600',
   },
+  messageButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  messageButtonText: {
+    fontSize: 20,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
   primaryButton: {
     flex: 1,
     height: 56,
@@ -771,6 +909,64 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 17,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  preMatchBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  preMatchCard: {
+    backgroundColor: '#111827',
+    padding: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  preMatchTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  preMatchSubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 10,
+  },
+  preMatchInput: {
+    borderWidth: 1,
+    borderColor: '#374151',
+    backgroundColor: '#0B1220',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#FFFFFF',
+    minHeight: 90,
+    marginBottom: 12,
+  },
+  preMatchActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  preMatchButton: {
+    flex: 1,
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  preMatchCancelButton: {
+    backgroundColor: '#1F2937',
+  },
+  preMatchSendButton: {
+    backgroundColor: '#F97316',
+  },
+  preMatchCancelText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  preMatchSendText: {
     color: '#FFFFFF',
     fontWeight: '700',
   },

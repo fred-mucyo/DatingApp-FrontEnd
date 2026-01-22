@@ -1,6 +1,7 @@
 {
   "expo": {
-    "name": "MUTIMA",
+    "scheme": "mutima",
+    "name": "Mutima",
     "slug": "uni-dating-beta",
     "version": "1.0.0",
     "orientation": "portrait",

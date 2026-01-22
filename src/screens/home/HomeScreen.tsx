@@ -1,4 +1,3 @@
-import { debounce } from 'lodash';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -14,7 +13,6 @@ import {
   Share,
   Dimensions,
   Platform,
-  UIManager,
   Modal,
   TextInput,
   Animated,
@@ -38,20 +36,6 @@ import { cacheService } from '../../services/cache';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 const { width, height } = Dimensions.get('window');
-
-const hasFastImageNativeView = !!(UIManager as any)?.getViewManagerConfig?.('FastImageView');
-
-const fastImageModule: any = hasFastImageNativeView
-  ? (() => {
-      try {
-        return require('react-native-fast-image');
-      } catch {
-        return null;
-      }
-    })()
-  : null;
-
-const FastImageComponent: any = hasFastImageNativeView ? fastImageModule?.default : null;
 
 export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const { user, profile } = useAuth();
@@ -202,7 +186,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       await cacheService.setSuggestionIndex(user.id, startIndex);
       
       setLocallyLikedIds([]);
-    } catch (e) {
+    } catch (e: any) {
       console.log('HOME getDailySuggestions error:', e);
       if (!cached) {
         Alert.alert('Error', e?.message ?? 'Failed to load suggestions');
@@ -393,7 +377,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: 'Check out this amazing dating app! Download it here : https://hashye.online/mutima-info now and find your match.',
+        message: 'Check out this amazing dating app! Download now and find your match.',
         title: 'Share App',
       });
     } catch (error) {
@@ -414,41 +398,37 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    // Check match in background (don't block navigation)
-    verifyMatchExists(user.id, profileId)
-      .then((match) => {
-        if (match) {
-          // Navigate to chat if match exists
-          navigation.navigate('Chat', {
-            matchId: match.id,
-            otherUserId: match.other_user_id,
-            otherUserName: match.other_user_name,
-            otherUserPhoto: match.other_user_photo ?? undefined,
-          });
-        } else {
-          // Check if pre-match message was sent
-          hasSentPreMatchMessage(user.id, profileId).then((alreadySent) => {
-            if (alreadySent) {
-              Alert.alert(
-                'Message sent',
-                'You already sent a message to this person. You can chat freely once you match.',
-              );
-            } else {
-              setPreMatchTarget(target);
-              setPreMatchMessage('');
-            }
-          });
-        }
-      })
-      .catch((e) => {
-        console.log('HOME handleMessage error:', e);
-      });
+    try {
+      const match = await verifyMatchExists(user.id, profileId);
+      if (match) {
+        navigation.navigate('Chat', {
+          matchId: match.id,
+          otherUserId: match.other_user_id,
+          otherUserName: match.other_user_name,
+          otherUserPhoto: match.other_user_photo ?? undefined,
+        });
+        return;
+      }
+
+      const alreadySent = await hasSentPreMatchMessage(user.id, profileId);
+      if (alreadySent) {
+        Alert.alert(
+          'Message sent',
+          'You already sent a message to this person. You can chat freely once you match.',
+        );
+        return;
+      }
+
+      setPreMatchTarget(target);
+      setPreMatchMessage('');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to open message composer');
+    }
   };
 
   const handleSendPreMatch = async () => {
-    if (!user || !preMatchTarget) {
-      return;
-    }
+    if (!user) return;
+    if (!preMatchTarget) return;
 
     const message = (preMatchMessage ?? '').trim();
     if (!message) {
@@ -459,12 +439,10 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     setPreMatchSending(true);
     try {
       await sendPreMatchMessage(user.id, preMatchTarget.id, message);
-
       Alert.alert(
         'Message sent',
-        `Your message was sent to ${preMatchTarget.name}. You can continue the conversation once you both match.`,
+        `Your message was sent to ${preMatchTarget.name ?? 'this person'}. You can continue the conversation once you both match.`,
       );
-
       setPreMatchTarget(null);
       setPreMatchMessage('');
     } catch (e: any) {
@@ -725,19 +703,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.photoContainer}>
               {primaryPhoto ? (
                 <View style={styles.imageWrapper}>
-                  {FastImageComponent ? (
-                    <FastImageComponent
-                      source={{
-                        uri: primaryPhoto,
-                        priority: fastImageModule?.priority?.normal,
-                        cache: fastImageModule?.cacheControl?.immutable,
-                      }}
-                      style={styles.profilePhoto}
-                      resizeMode={fastImageModule?.resizeMode?.cover}
-                    />
-                  ) : (
-                    <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
-                  )}
+                  <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
                 </View>
               ) : (
                 <View style={[styles.profilePhoto, styles.photoPlaceholder]}>
@@ -1006,6 +972,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1A1A1A',
+  },
+  skeletonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 32,
+    paddingHorizontal: 16,
+    gap: 16,
+  },
+  skeletonCard: {
+    width: 220,
+    height: 340,
+    backgroundColor: '#111827',
+    borderRadius: 24,
+    padding: 16,
+  },
+  skeletonPhoto: {
+    width: '100%',
+    height: 200,
+    backgroundColor: '#1F2937',
+    borderRadius: 16,
+    marginBottom: 18,
+  },
+  skeletonTextRow: {
+    width: '70%',
+    height: 18,
+    backgroundColor: '#374151',
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  skeletonTextRowShort: {
+    width: '45%',
+    height: 14,
+    backgroundColor: '#374151',
+    borderRadius: 8,
   },
   carousel: {
     flex: 1,

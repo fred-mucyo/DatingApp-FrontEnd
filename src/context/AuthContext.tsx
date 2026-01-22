@@ -4,7 +4,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../config/supabaseClient';
 import { Profile } from '../types/profile';
 import { cacheService } from '../services/cache';
-
+import * as Linking from 'expo-linking';
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
@@ -187,9 +187,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPasswordForEmail = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
 
-    if (error) {
+const redirectTo = Linking.createURL('reset-password');
+
+const { error } = await supabase.auth.resetPasswordForEmail(email, {
+  redirectTo,
+});
+
+
+  if (error) {
       Alert.alert('Password reset error', error.message);
       throw error;
     }

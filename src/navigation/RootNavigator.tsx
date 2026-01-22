@@ -3,52 +3,51 @@ import { View, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 
-const LoginScreen = React.lazy(() =>
-  import('../screens/auth/LoginScreen').then((m) => ({ default: m.LoginScreen })),
+const lazyNamed = <T extends React.ComponentType<any>>(
+  importer: () => Promise<any>,
+  exportName: string,
+) =>
+  React.lazy(async () => {
+    const mod = await importer();
+    const component = mod?.[exportName] ?? mod?.default;
+    if (!component) {
+      throw new Error(
+        `Lazy-loaded screen export not found. Expected export "${exportName}" or a default export.`,
+      );
+    }
+    return { default: component as T };
+  });
+
+const LoginScreen = lazyNamed(() => import('../screens/auth/LoginScreen'), 'LoginScreen');
+const SignUpScreen = lazyNamed(() => import('../screens/auth/SignUpScreen'), 'SignUpScreen');
+const ResetPasswordScreen = lazyNamed(
+  () => import('../screens/auth/ResetPasswordScreen'),
+  'ResetPasswordScreen',
 );
-const SignUpScreen = React.lazy(() =>
-  import('../screens/auth/SignUpScreen').then((m) => ({ default: m.SignUpScreen })),
+const ProfileWizardScreen = lazyNamed(
+  () => import('../screens/profile/ProfileWizardScreen'),
+  'ProfileWizardScreen',
 );
-const ProfileWizardScreen = React.lazy(() =>
-  import('../screens/profile/ProfileWizardScreen').then((m) => ({
-    default: m.ProfileWizardScreen,
-  })),
+const HomeScreen = lazyNamed(() => import('../screens/home/HomeScreen'), 'HomeScreen');
+const DiscoveryScreen = lazyNamed(() => import('../screens/discovery/DiscoveryScreen'), 'DiscoveryScreen');
+const ExploreScreen = React.lazy(() => import('../screens/explore/ExploreScreen'));
+const MatchesScreen = lazyNamed(() => import('../screens/chat/MatchesScreen'), 'MatchesScreen');
+const LikesScreen = lazyNamed(() => import('../screens/chat/LikesScreen'), 'LikesScreen');
+const ViewUserProfileScreen = lazyNamed(
+  () => import('../screens/profile/ViewUserProfileScreen'),
+  'ViewUserProfileScreen',
 );
-const HomeScreen = React.lazy(() =>
-  import('../screens/home/HomeScreen').then((m) => ({ default: m.HomeScreen })),
-);
-const DiscoveryScreen = React.lazy(() =>
-  import('../screens/discovery/DiscoveryScreen').then((m) => ({ default: m.DiscoveryScreen })),
-);
-const ExploreScreen = React.lazy(() =>
-  import('../screens/explore/ExploreScreen').then((m) => ({ default: m.default })),
-);
-const MatchesScreen = React.lazy(() =>
-  import('../screens/chat/MatchesScreen').then((m) => ({ default: m.MatchesScreen })),
-);
-const LikesScreen = React.lazy(() =>
-  import('../screens/chat/LikesScreen').then((m) => ({ default: m.LikesScreen })),
-);
-const ViewUserProfileScreen = React.lazy(() =>
-  import('../screens/profile/ViewUserProfileScreen').then((m) => ({
-    default: m.ViewUserProfileScreen,
-  })),
-);
-const MyProfileScreen = React.lazy(() =>
-  import('../screens/profile/MyProfileScreen').then((m) => ({ default: m.MyProfileScreen })),
-);
-const ChatScreen = React.lazy(() =>
-  import('../screens/chat/ChatScreen').then((m) => ({ default: m.ChatScreen })),
-);
-const SupportCenterScreen = React.lazy(() =>
-  import('../screens/support/SupportCenterScreen').then((m) => ({
-    default: m.SupportCenterScreen,
-  })),
+const MyProfileScreen = lazyNamed(() => import('../screens/profile/MyProfileScreen'), 'MyProfileScreen');
+const ChatScreen = lazyNamed(() => import('../screens/chat/ChatScreen'), 'ChatScreen');
+const SupportCenterScreen = lazyNamed(
+  () => import('../screens/support/SupportCenterScreen'),
+  'SupportCenterScreen',
 );
 
 export type RootStackParamList = {
   Login: undefined;
   SignUp: undefined;
+  ResetPassword: undefined;
   ProfileWizard: undefined;
   Home: undefined;
   Discovery: undefined;
@@ -93,6 +92,11 @@ export const RootNavigator = () => {
             component={SignUpScreen}
             options={{ title: 'Create Account' }}
           />
+          <Stack.Screen
+            name="ResetPassword"
+            component={ResetPasswordScreen}
+            options={{ title: 'Reset password' }}
+          />
         </>
       )}
 
@@ -113,6 +117,11 @@ export const RootNavigator = () => {
             name="Home"
             component={HomeScreen}
             options={{ title: 'MUTIMA' }}
+          />
+          <Stack.Screen
+            name="ResetPassword"
+            component={ResetPasswordScreen}
+            options={{ title: 'Reset password' }}
           />
           <Stack.Screen
             name="Discovery"
