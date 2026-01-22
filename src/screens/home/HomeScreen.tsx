@@ -376,9 +376,10 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleShare = async () => {
     try {
+      const url = 'https://hashye.online/mutima-info';
       await Share.share({
-        message: 'Check out this amazing dating app! Download now and find your match.',
-        title: 'Share App',
+        message: `Check out this amazing dating app! Download now and find your match\n\nLearn more: ${url}`,
+        title: 'Mutima',
       });
     } catch (error) {
       console.log('Error sharing:', error);
@@ -809,14 +810,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     <View style={styles.safeArea}>
       <View style={styles.container}>
         {loadingSuggestions ? (
-          <View style={styles.skeletonContainer}>
-            {[...Array(2)].map((_, i) => (
-              <View key={i} style={styles.skeletonCard}>
-                <View style={styles.skeletonPhoto} />
-                <View style={styles.skeletonTextRow} />
-                <View style={styles.skeletonTextRowShort} />
-              </View>
-            ))}
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#F97316" />
+            <Text style={styles.loadingText}>Loading suggestions...</Text>
           </View>
         ) : suggestions.length === 0 ? (
           <View style={styles.emptyStateContainer}>
