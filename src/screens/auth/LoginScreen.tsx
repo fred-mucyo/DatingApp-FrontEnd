@@ -11,6 +11,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../context/AuthContext';
@@ -20,7 +21,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 export type LoginScreenProps = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
-  const { signInWithIdentifierPassword, resetPasswordForEmail } = useAuth();
+  const { signInWithIdentifierPassword } = useAuth();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -49,20 +50,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   };
 
   const handleForgotPassword = async () => {
-    if (!identifier.trim() || !identifier.includes('@')) {
-      setInfo('Please enter the email you registered with to reset your password.');
-      return;
-    }
-
-    setLoading(true);
     setInfo('');
-    try {
-      await resetPasswordForEmail(identifier.trim().toLowerCase());
-    } catch {
-      // Error already surfaced via Alert
-    } finally {
-      setLoading(false);
-    }
+    await Linking.openURL('https://mutima-reset.netlify.app/reset-password');
   };
 
   const ProfileIcon = () => (
