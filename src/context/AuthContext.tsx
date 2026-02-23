@@ -188,7 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPasswordForEmail = async (email: string) => {
-    const redirectTo = 'https://mutima-reset.netlify.app/reset-password';
+    const redirectTo = 'https://mutima-reset.netlify.app/reset-password.html';
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,
