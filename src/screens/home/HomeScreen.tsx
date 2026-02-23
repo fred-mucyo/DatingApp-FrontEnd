@@ -57,6 +57,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [newLikesCount, setNewLikesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
+  const VISIBLE_PROFILES_COUNT = 10;
+
   const greetingName = profile?.name || user?.email || 'there';
 
   // Shuffle array to rotate suggestions
@@ -113,7 +115,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // Resume from last viewed index or random position
       const startIndex = cachedIndex !== null && cachedIndex < shuffled.length 
         ? cachedIndex 
-        : Math.floor(Math.random() * Math.min(5, shuffled.length));
+        : Math.floor(Math.random() * Math.min(VISIBLE_PROFILES_COUNT, shuffled.length));
       setSuggestionIndex(startIndex);
       setLoadingSuggestions(false); // Show cached data immediately
     } else {
@@ -122,7 +124,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       // Load fresh suggestions in background
-      const data = await getDailySuggestions(5, 20);
+      const data = await getDailySuggestions(5, 30);
       
       // If RPC didn't include photos, enrich from profiles table (in batches for performance)
       const batchSize = 5;
@@ -181,7 +183,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const lastIndex = await cacheService.getSuggestionIndex(user.id);
       const startIndex = lastIndex !== null && lastIndex < shuffled.length 
         ? lastIndex 
-        : Math.floor(Math.random() * Math.min(5, shuffled.length));
+        : Math.floor(Math.random() * Math.min(VISIBLE_PROFILES_COUNT, shuffled.length));
       setSuggestionIndex(startIndex);
       await cacheService.setSuggestionIndex(user.id, startIndex);
       
@@ -215,7 +217,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         setSuggestions(shuffled);
         const startIndex = cachedIndex !== null && cachedIndex < shuffled.length 
           ? cachedIndex 
-          : Math.floor(Math.random() * Math.min(5, shuffled.length));
+          : Math.floor(Math.random() * Math.min(VISIBLE_PROFILES_COUNT, shuffled.length));
         setSuggestionIndex(startIndex);
         setLoadingSuggestions(false);
       }
@@ -317,7 +319,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [refreshing, loadSuggestions, loadLikesToday, loadUnreadMessagesCount, loadNewLikesCount]);
 
-  const visibleSuggestions = suggestions.slice(suggestionIndex, suggestionIndex + 5);
+  const visibleSuggestions = suggestions.slice(suggestionIndex, suggestionIndex + VISIBLE_PROFILES_COUNT);
 
   const handlePass = async (profileToPass?: SuggestionProfile) => {
     // Marking a profile as passed is intentionally simple and local.

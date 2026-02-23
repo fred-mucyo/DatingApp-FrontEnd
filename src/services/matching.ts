@@ -64,12 +64,7 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
     .eq('id', me)
     .maybeSingle();
 
-  const [profilesRes, likesRes, blocksRes, passedIds] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select(
-        'id, name, age, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos',
-      ),
+  const [likesRes, blocksRes, passedIds] = await Promise.all([
     supabase.from('likes').select('liked_id').eq('liker_id', me),
     supabase
       .from('blocks')
@@ -78,35 +73,45 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
     getPassedProfileIds(me),
   ]);
 
-  const allProfiles = (profilesRes.data as any[]) ?? [];
-  const likedIds = new Set(
-    ((likesRes.data as any[]) ?? [])
-      .map((row) => row.liked_id as string | null)
-      .filter((id): id is string => !!id),
-  );
+  const likedIds = ((likesRes.data as any[]) ?? [])
+    .map((row) => row.liked_id as string | null)
+    .filter((id): id is string => !!id);
 
-  const blockedIds = new Set<string>();
+  const blockedOtherIds: string[] = [];
   for (const row of (blocksRes.data as any[]) ?? []) {
     const blocker = row.blocker_id as string;
     const blocked = row.blocked_id as string;
     const other = blocker === me ? blocked : blocker;
-    if (other) blockedIds.add(other);
+    if (other) blockedOtherIds.push(other);
   }
 
-  const passedSet = new Set<string>(passedIds ?? []);
+  const passedList = (passedIds ?? []).filter((id) => typeof id === 'string');
 
-  const filtered = allProfiles.filter((p) => {
-    const id = p.id as string;
-    if (!id || id === me) return false;
-    if (likedIds.has(id)) return false;
-    if (blockedIds.has(id)) return false;
-    if (passedSet.has(id)) return false;
-    return true;
-  });
+  const toQuotedInList = (ids: string[]) => `(${ids.map((id) => `"${id}"`).join(',')})`;
 
-  // If nothing left after minimal filtering, just return everyone except self
-  // so the user still sees *something* in a tiny user base.
-  const candidates = filtered.length > 0 ? filtered : allProfiles.filter((p) => p.id !== me);
+  let profilesQuery = supabase
+    .from('profiles')
+    .select(
+      'id, name, age, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos',
+    )
+    .neq('id', me)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (likedIds.length > 0) {
+    profilesQuery = profilesQuery.not('id', 'in', toQuotedInList(likedIds));
+  }
+  if (blockedOtherIds.length > 0) {
+    profilesQuery = profilesQuery.not('id', 'in', toQuotedInList(blockedOtherIds));
+  }
+  if (passedList.length > 0) {
+    profilesQuery = profilesQuery.not('id', 'in', toQuotedInList(passedList));
+  }
+
+  const { data: profilesPage, error: profilesErr } = await profilesQuery;
+  if (profilesErr) throw profilesErr;
+
+  const candidates = (profilesPage as any[]) ?? [];
 
   const myCity = (myProfile as any)?.city as string | null;
   const myCountry = (myProfile as any)?.country as string | null;
@@ -123,9 +128,7 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
   });
 
   scored.sort((a, b) => b.score - a.score);
-  // Apply pagination - get all scored first, then slice
-  const allScored = scored.map((s) => s.profile);
-  return allScored.slice(offset, offset + limit);
+  return scored.map((s) => s.profile);
 };
 
 export const getDailySuggestions = async (

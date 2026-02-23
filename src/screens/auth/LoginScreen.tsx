@@ -93,7 +93,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             <View style={styles.headerArea}>
               <Text style={styles.appName}>Mutima</Text>
               <View style={styles.betaBadge}>
-                <Text style={styles.betaText}>BETA</Text>
+                <Text style={styles.betaText}></Text>
               </View>
             </View>
 
@@ -192,10 +192,28 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
                   <Text style={styles.footerLinkText}>Create account</Text>
                 </TouchableOpacity>
               </View>
+
+              <Text style={styles.legalText}>
+                <Text
+                  style={styles.legalLink}
+                  onPress={() => navigation.navigate('TermsOfService')}
+                  suppressHighlighting
+                >
+                  Terms
+                </Text>
+                {' · '}
+                <Text
+                  style={styles.legalLink}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                  suppressHighlighting
+                >
+                  Privacy Policy
+                </Text>
+              </Text>
             </View>
 
             {/* Bottom Tagline */}
-            <Text style={styles.bottomText}>Let's connect and chill 🔥</Text>
+            <Text style={styles.bottomText}>Thousands are already here. Are you?</Text>
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
@@ -396,12 +414,22 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#6366F1',
   },
+  legalText: {
+    marginTop: 14,
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+  },
+  legalLink: {
+    fontSize: 12,
+    color: '#6366F1',
+    fontWeight: '700',
+  },
   bottomText: {
     marginTop: 20,
     fontSize: 13,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
-   fontWeight: 'bold',
-
+    fontWeight: 'bold',
   },
 });

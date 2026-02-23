@@ -188,19 +188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPasswordForEmail = async (email: string) => {
-    const path = 'reset-password';
-    const hostUri =
-      (Constants.expoConfig as any)?.hostUri ??
-      (Constants as any)?.manifest2?.extra?.expoClient?.hostUri ??
-      (Constants as any)?.manifest?.hostUri;
-
-    const normalizedHostUri =
-      typeof hostUri === 'string' && hostUri.includes('://') ? hostUri.split('://')[1] : hostUri;
-
-    const redirectTo =
-      Constants.appOwnership === 'expo' && typeof normalizedHostUri === 'string' && normalizedHostUri
-        ? `exp://${normalizedHostUri}/--/${path}`
-        : Linking.createURL(path);
+    const redirectTo = 'https://mutima-reset.netlify.app/reset-password';
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo,

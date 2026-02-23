@@ -1,0 +1,7 @@
+[build]
+  publish = "reset-password-web"
+
+[[redirects]]
+  from = "/reset-password"
+  to = "/reset-password.html"
+  status = 200

@@ -9,6 +9,7 @@ import { INTEREST_TAGS } from '../../constants/interests';
 import { Gender, RelationshipGoal, GenderPreference } from '../../types/profile';
 import { uploadImageToCloudinary } from '../../utils/cloudinary';
 import { supabase } from '../../config/supabaseClient';
+import { deleteMyAccount } from '../../services/account';
 
 export type MyProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'MyProfile'>;
 
@@ -187,6 +188,32 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    if (!user) return;
+
+    Alert.alert(
+      'Delete account',
+      'This will permanently delete your account and your data. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setSaving(true);
+              await deleteMyAccount(user.id);
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to delete account');
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (loading) {
@@ -447,6 +474,31 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
             activeOpacity={0.8}
           >
             <Text style={styles.supportButtonText}>Support Center</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('TermsOfService')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.supportButtonText}>Terms of Service</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('PrivacyPolicy')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.supportButtonText}>Privacy Policy</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={handleDeleteAccount}
+            activeOpacity={0.8}
+            disabled={saving}
+          >
+            <Text style={styles.deleteButtonText}>Delete account</Text>
           </TouchableOpacity>
         </View>
 
@@ -745,5 +797,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#2563EB',
+  },
+  deleteButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#B91C1C',
   },
 });

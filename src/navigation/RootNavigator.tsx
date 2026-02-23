@@ -43,11 +43,21 @@ const SupportCenterScreen = lazyNamed(
   () => import('../screens/support/SupportCenterScreen'),
   'SupportCenterScreen',
 );
+const TermsOfServiceScreen = lazyNamed(
+  () => import('../screens/legal/TermsOfServiceScreen'),
+  'TermsOfServiceScreen',
+);
+const PrivacyPolicyScreen = lazyNamed(
+  () => import('../screens/legal/PrivacyPolicyScreen'),
+  'PrivacyPolicyScreen',
+);
 
 export type RootStackParamList = {
   Login: undefined;
   SignUp: undefined;
   ResetPassword: undefined;
+  TermsOfService: undefined;
+  PrivacyPolicy: undefined;
   ProfileWizard: undefined;
   Home: undefined;
   Discovery: undefined;
@@ -96,6 +106,16 @@ export const RootNavigator = () => {
             name="ResetPassword"
             component={ResetPasswordScreen}
             options={{ title: 'Reset password' }}
+          />
+          <Stack.Screen
+            name="TermsOfService"
+            component={TermsOfServiceScreen}
+            options={{ title: 'Terms of Service' }}
+          />
+          <Stack.Screen
+            name="PrivacyPolicy"
+            component={PrivacyPolicyScreen}
+            options={{ title: 'Privacy Policy' }}
           />
         </>
       )}
@@ -152,6 +172,16 @@ export const RootNavigator = () => {
             name="SupportCenter"
             component={SupportCenterScreen}
             options={{ title: 'Support center' }}
+          />
+          <Stack.Screen
+            name="TermsOfService"
+            component={TermsOfServiceScreen}
+            options={{ title: 'Terms of Service' }}
+          />
+          <Stack.Screen
+            name="PrivacyPolicy"
+            component={PrivacyPolicyScreen}
+            options={{ title: 'Privacy Policy' }}
           />
           <Stack.Screen
             name="ViewUserProfile"

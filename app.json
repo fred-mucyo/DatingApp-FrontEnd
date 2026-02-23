@@ -1,9 +1,9 @@
 {
   "expo": {
-    "scheme": "mutima",
-    "name": "Mutima",
+    "name": "MUTIMA",
     "slug": "uni-dating-beta",
     "version": "1.0.0",
+    "scheme": "mutima",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -34,7 +34,11 @@
     "extra": {
       "eas": {
         "projectId": "b3d5b38f-d933-474c-8b16-1e48c7677ff7"
-      }
+      },
+  "EXPO_PUBLIC_SUPABASE_URL": "https://bkoeyolarhjwozlijrpw.supabase.co",
+  "EXPO_PUBLIC_SUPABASE_ANON_KEY":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJrb2V5b2xhcmhqd296bGlqcnB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxNTE3MjksImV4cCI6MjA4MTcyNzcyOX0.Jxm060ao1b6dG1uE134_eimlzfwPAOAGXE4RIajWJ8k",
+  "EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME": "deefcixtc",
+  "EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET": "dating_app_cloudinary_preset"
     },
     "owner": "mucyo_fred"
   }

@@ -9,11 +9,22 @@ import { RootNavigator } from './src/navigation/RootNavigator';
 import * as Notifications from 'expo-notifications';
 import { navigationRef } from './src/navigation/navigationRef';
 import * as Linking from 'expo-linking';
+import type { LinkingOptions } from '@react-navigation/native';
+import type { RootStackParamList } from './src/navigation/RootNavigator';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
     Montserrat_900Black,
   });
+
+  const linking: LinkingOptions<RootStackParamList> = {
+    prefixes: [Linking.createURL('/')],
+    config: {
+      screens: {
+        ResetPassword: 'reset-password',
+      },
+    },
+  };
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync().then((response) => {
@@ -53,21 +64,13 @@ export default function App() {
       });
     }
   };
-  const linking = {
-    prefixes: [Linking.createURL('/'), 'mutima://', 'exp://'],
-    config: {
-      screens: {
-        ResetPassword: 'reset-password',
-      },
-    },
-  };
 
   // If the font hasn't loaded yet, we still render the app.
   // Text using Montserrat_900Black will temporarily fall back to the system font.
   return (
     <SafeAreaProvider>
       <AuthProvider>
-      <NavigationContainer ref={navigationRef} linking={linking}>
+        <NavigationContainer ref={navigationRef} linking={linking}>
           <RootNavigator />
           <StatusBar style="dark" />
         </NavigationContainer>

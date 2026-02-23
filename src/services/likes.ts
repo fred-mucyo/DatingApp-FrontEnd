@@ -15,6 +15,19 @@ export const fetchIncomingLikes = async (
   limit?: number,
   offset = 0,
 ): Promise<IncomingLikeProfile[]> => {
+  const { data: blocksRes } = await supabase
+    .from('blocks')
+    .select('blocker_id, blocked_id')
+    .or(`blocker_id.eq.${currentUserId},blocked_id.eq.${currentUserId}`);
+
+  const blockedOtherUserIds = new Set<string>();
+  for (const row of (blocksRes as any[]) ?? []) {
+    const blocker = row.blocker_id as string;
+    const blocked = row.blocked_id as string;
+    const otherId = blocker === currentUserId ? blocked : blocker;
+    if (otherId) blockedOtherUserIds.add(otherId);
+  }
+
   let query = supabase
     .from('likes')
     .select('id, liker:profiles!likes_liker_id_fkey(id, name, age, city, country, profile_photos, photos)')
@@ -35,6 +48,10 @@ export const fetchIncomingLikes = async (
       const liker = row.liker;
       if (!liker) {
         // If the liker profile no longer exists or is null, skip this row.
+        return null;
+      }
+
+      if (blockedOtherUserIds.has(liker.id as string)) {
         return null;
       }
 

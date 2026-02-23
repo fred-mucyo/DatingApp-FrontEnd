@@ -23,11 +23,33 @@
 // src/config/env.ts
 
 
+import Constants from 'expo-constants';
+
 export const env = {
-  supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!,
-  cloudinaryCloudName: process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME!,
-  cloudinaryUploadPreset: process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET!,
+  supabaseUrl:
+    process.env.EXPO_PUBLIC_SUPABASE_URL ??
+    process.env.SUPABASE_URL ??
+    ((Constants.expoConfig as any)?.extra?.EXPO_PUBLIC_SUPABASE_URL as string | undefined) ??
+    ((Constants.expoConfig as any)?.extra?.SUPABASE_URL as string | undefined) ??
+    '',
+  supabaseAnonKey:
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    ((Constants.expoConfig as any)?.extra?.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined) ??
+    ((Constants.expoConfig as any)?.extra?.SUPABASE_ANON_KEY as string | undefined) ??
+    '',
+  cloudinaryCloudName:
+    process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME ??
+    process.env.CLOUDINARY_CLOUD_NAME ??
+    ((Constants.expoConfig as any)?.extra?.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME as string | undefined) ??
+    ((Constants.expoConfig as any)?.extra?.CLOUDINARY_CLOUD_NAME as string | undefined) ??
+    '',
+  cloudinaryUploadPreset:
+    process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET ??
+    process.env.CLOUDINARY_UPLOAD_PRESET ??
+    ((Constants.expoConfig as any)?.extra?.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET as string | undefined) ??
+    ((Constants.expoConfig as any)?.extra?.CLOUDINARY_UPLOAD_PRESET as string | undefined) ??
+    '',
 };
 
 if (!env.supabaseUrl || !env.supabaseAnonKey) {

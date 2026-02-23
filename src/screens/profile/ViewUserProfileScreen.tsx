@@ -20,6 +20,7 @@ import { supabase } from '../../config/supabaseClient';
 import { useAuth } from '../../context/AuthContext';
 import { sendLike } from '../../services/matching';
 import { hasSentPreMatchMessage, sendPreMatchMessage, verifyMatchExists } from '../../services/chat';
+import { submitReport, ReportReason } from '../../services/reports';
 import { cacheService } from '../../services/cache';
 
 export type ViewUserProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'ViewUserProfile'>;
@@ -52,6 +53,10 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   const [preMatchVisible, setPreMatchVisible] = useState(false);
   const [preMatchMessage, setPreMatchMessage] = useState('');
   const [preMatchSending, setPreMatchSending] = useState(false);
+  const [reportVisible, setReportVisible] = useState(false);
+  const [reportReason, setReportReason] = useState<ReportReason | null>(null);
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
   const [myInterests, setMyInterests] = useState<string[]>([]);
   const scrollRef = useRef<ScrollView | null>(null);
 
@@ -340,6 +345,87 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
       ? profile.interests.filter((i) => myInterests.includes(i)).slice(0, 4)
       : [];
 
+  const handleBlockUser = async () => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to block users.');
+      return;
+    }
+    if (user.id === userId) {
+      Alert.alert('Info', 'You cannot block yourself.');
+      return;
+    }
+
+    Alert.alert(
+      'Block user',
+      `Are you sure you want to block ${displayName}? You will no longer see each other.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Block',
+          style: 'destructive',
+          onPress: async () => {
+            setMenuVisible(false);
+            setActionLoading(true);
+            try {
+              const { error } = await supabase.from('blocks').insert({
+                blocker_id: user.id,
+                blocked_id: userId,
+              });
+              if (error) {
+                Alert.alert('Error', error.message ?? 'Failed to block user');
+                return;
+              }
+
+              await Promise.all([
+                cacheService.invalidate(`matches_${user.id}`),
+                cacheService.invalidate(`likes_${user.id}`),
+                cacheService.invalidate(`suggestions_${user.id}`),
+              ]);
+
+              Alert.alert('Blocked', `${displayName} has been blocked.`);
+              navigation.goBack();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to block user');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const openReportFlow = () => {
+    if (!user) {
+      Alert.alert('Sign in required', 'Please sign in to report users.');
+      return;
+    }
+    if (user.id === userId) {
+      Alert.alert('Info', 'You cannot report yourself.');
+      return;
+    }
+    setMenuVisible(false);
+    setReportReason(null);
+    setReportDescription('');
+    setReportVisible(true);
+  };
+
+  const handleSubmitReport = async () => {
+    if (!user || !reportReason) return;
+    setReportSubmitting(true);
+    try {
+      await submitReport(user.id, userId, null, reportReason, reportDescription || undefined);
+      Alert.alert('Report submitted', 'Thank you. We will review your report.');
+      setReportVisible(false);
+      setReportReason(null);
+      setReportDescription('');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to submit report');
+    } finally {
+      setReportSubmitting(false);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.root}>
@@ -569,10 +655,18 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             onPress={() => setMenuVisible(false)}
           >
             <View style={styles.menuSheet}>
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.8}
+                onPress={openReportFlow}
+              >
                 <Text style={styles.menuItemText}>🚩 Report user</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.menuItem} activeOpacity={0.8}>
+              <TouchableOpacity
+                style={styles.menuItem}
+                activeOpacity={0.8}
+                onPress={handleBlockUser}
+              >
                 <Text style={styles.menuItemText}>⛔ Block user</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -582,6 +676,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               >
                 <Text style={styles.menuItemText}>📤 Share profile</Text>
               </TouchableOpacity>
+
               <TouchableOpacity
                 style={[styles.menuItem, styles.menuCancelItem]}
                 activeOpacity={0.8}
@@ -589,6 +684,103 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               >
                 <Text style={styles.menuCancelText}>Cancel</Text>
               </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
+
+        <Modal
+          visible={reportVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => {
+            if (!reportSubmitting) {
+              setReportVisible(false);
+              setReportReason(null);
+              setReportDescription('');
+            }
+          }}
+        >
+          <TouchableOpacity
+            style={styles.preMatchBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              if (!reportSubmitting) {
+                setReportVisible(false);
+                setReportReason(null);
+                setReportDescription('');
+              }
+            }}
+          >
+            <View style={styles.preMatchCard} onStartShouldSetResponder={() => true}>
+              <Text style={styles.preMatchTitle}>Report {displayName}</Text>
+              <Text style={styles.preMatchSubtitle}>Choose a reason (optional details below).</Text>
+
+              <View style={styles.preMatchActionsRow}>
+                {([
+                  'harassment',
+                  'spam',
+                  'fake_profile',
+                  'inappropriate_content',
+                  'scam',
+                  'other',
+                ] as ReportReason[]).map((reason) => (
+                  <TouchableOpacity
+                    key={reason}
+                    style={[
+                      styles.preMatchButton,
+                      reportReason === reason ? styles.preMatchSendButton : styles.preMatchCancelButton,
+                    ]}
+                    onPress={() => setReportReason(reason)}
+                    disabled={reportSubmitting}
+                  >
+                    <Text
+                      style={
+                        reportReason === reason ? styles.preMatchSendText : styles.preMatchCancelText
+                      }
+                    >
+                      {reason.replace(/_/g, ' ')}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.preMatchInput}
+                multiline
+                placeholder="Details (optional)"
+                placeholderTextColor="#9CA3AF"
+                value={reportDescription}
+                onChangeText={(text) => {
+                  if (text.length <= 500) setReportDescription(text);
+                }}
+              />
+
+              <View style={styles.preMatchActionsRow}>
+                <TouchableOpacity
+                  style={[styles.preMatchButton, styles.preMatchCancelButton]}
+                  onPress={() => {
+                    if (reportSubmitting) return;
+                    setReportVisible(false);
+                    setReportReason(null);
+                    setReportDescription('');
+                  }}
+                >
+                  <Text style={styles.preMatchCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.preMatchButton,
+                    styles.preMatchSendButton,
+                    (!reportReason || reportSubmitting) && { opacity: 0.6 },
+                  ]}
+                  onPress={handleSubmitReport}
+                  disabled={!reportReason || reportSubmitting}
+                >
+                  <Text style={styles.preMatchSendText}>
+                    {reportSubmitting ? 'Submitting…' : 'Submit'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </TouchableOpacity>
         </Modal>

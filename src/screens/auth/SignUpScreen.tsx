@@ -1099,7 +1099,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
             <View style={styles.card}>
               {/* Compact Title */}
               <Text style={styles.cardTitle}>Create Account</Text>
-              <Text style={styles.cardSubtitle}>Join thousands of students</Text>
+              <Text style={styles.cardSubtitle}>Thousands are already here. Are you?</Text>
 
               {/* Username Field - Compact */}
               <View style={styles.fieldGroup}>
@@ -1232,7 +1232,22 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
               {/* Compact Terms */}
               <Text style={styles.termsText}>
-                By signing up, you agree to our <Text style={styles.termsLink}>Terms</Text> and <Text style={styles.termsLink}>Privacy Policy</Text>
+                By signing up, you agree to our{' '}
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => navigation.navigate('TermsOfService')}
+                  suppressHighlighting
+                >
+                  Terms
+                </Text>{' '}
+                and{' '}
+                <Text
+                  style={styles.termsLink}
+                  onPress={() => navigation.navigate('PrivacyPolicy')}
+                  suppressHighlighting
+                >
+                  Privacy Policy
+                </Text>
               </Text>
             </View>
 
