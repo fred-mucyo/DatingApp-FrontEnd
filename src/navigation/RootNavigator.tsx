@@ -38,6 +38,10 @@ const ViewUserProfileScreen = lazyNamed(
   'ViewUserProfileScreen',
 );
 const MyProfileScreen = lazyNamed(() => import('../screens/profile/MyProfileScreen'), 'MyProfileScreen');
+const RequestVerificationScreen = lazyNamed(
+  () => import('../screens/profile/RequestVerificationScreen'),
+  'RequestVerificationScreen',
+);
 const ChatScreen = lazyNamed(() => import('../screens/chat/ChatScreen'), 'ChatScreen');
 const SupportCenterScreen = lazyNamed(
   () => import('../screens/support/SupportCenterScreen'),
@@ -65,6 +69,7 @@ export type RootStackParamList = {
   Likes: undefined;
   Matches: undefined;
   MyProfile: undefined;
+  RequestVerification: undefined;
   SupportCenter: undefined;
   ViewUserProfile: { userId: string };
   Chat: { matchId: string; otherUserId: string; otherUserName: string; otherUserPhoto?: string | null };
@@ -167,6 +172,11 @@ export const RootNavigator = () => {
             name="MyProfile"
             component={MyProfileScreen}
             options={{ title: 'My profile' }}
+          />
+          <Stack.Screen
+            name="RequestVerification"
+            component={RequestVerificationScreen}
+            options={{ title: 'Request verification' }}
           />
           <Stack.Screen
             name="SupportCenter"

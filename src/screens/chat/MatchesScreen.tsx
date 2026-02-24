@@ -227,7 +227,7 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         <View style={styles.cardContent}>
           <View style={styles.cardTopRow}>
             <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>
-              {item.other_user_name}
+              {item.other_user_name}{item.other_user_is_verified ? ' ✓' : ''}
             </Text>
             {!!lastTimeLabel && <Text style={styles.timeText}>{lastTimeLabel}</Text>}
           </View>

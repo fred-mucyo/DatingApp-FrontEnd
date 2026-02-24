@@ -12,6 +12,7 @@ export interface MatchItem {
   other_user_name: string;
   other_user_age: number | null;
   other_user_photo: string | null;
+  other_user_is_verified?: boolean | null;
   last_message_content: string | null;
   last_message_created_at: string | null;
   last_message_sender_id: string | null;
@@ -174,6 +175,7 @@ export const fetchMatchesWithLastMessage = async (currentUserId: string): Promis
       other_user_name: other.name,
       other_user_age: other.age ?? null,
       other_user_photo: otherPhoto,
+      other_user_is_verified: (other as any).is_verified ?? null,
       last_message_content: lastMsg?.content ?? null,
       last_message_created_at: lastMsg?.created_at ?? null,
       last_message_sender_id: lastMsg?.sender_id ?? null,

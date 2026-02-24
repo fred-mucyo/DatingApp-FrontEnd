@@ -8,6 +8,7 @@ export interface IncomingLikeProfile {
   city: string | null;
   country: string | null;
   profile_photos: string[] | null;
+  is_verified?: boolean | null;
 }
 
 export const fetchIncomingLikes = async (
@@ -30,7 +31,7 @@ export const fetchIncomingLikes = async (
 
   let query = supabase
     .from('likes')
-    .select('id, liker:profiles!likes_liker_id_fkey(id, name, age, city, country, profile_photos, photos)')
+    .select('id, liker:profiles!likes_liker_id_fkey(id, name, age, city, country, profile_photos, photos, is_verified)')
     .eq('liked_id', currentUserId)
     .order('created_at', { ascending: false });
 
@@ -70,6 +71,7 @@ export const fetchIncomingLikes = async (
         city: (liker.city as string) ?? null,
         country: (liker.country as string) ?? null,
         profile_photos: resolvedPhotos,
+        is_verified: (liker.is_verified as boolean) ?? null,
       } as IncomingLikeProfile;
     })
     .filter((item): item is IncomingLikeProfile => item !== null);

@@ -165,7 +165,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
 
           <View style={styles.cardInfo}>
             <Text style={styles.name} numberOfLines={1}>
-              {item.name ?? 'Unknown user'}
+              {(item.name ?? 'Unknown user')}{item.is_verified ? ' ✓' : ''}
               {item.age ? `, ${item.age}` : ''}
             </Text>
             {!!(item.city || item.country) && (

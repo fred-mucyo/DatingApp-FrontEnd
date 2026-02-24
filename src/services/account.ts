@@ -109,3 +109,58 @@ export const deleteMyAccount = async (userId: string): Promise<void> => {
   // 3) Finally sign out locally.
   await supabase.auth.signOut();
 };
+
+export const requestMyDataExport = async (): Promise<{ fileName: string; contents: string }> => {
+  if (!env.supabaseAnonKey) {
+    throw new Error(
+      'Missing Supabase anon key. Set EXPO_PUBLIC_SUPABASE_ANON_KEY (or SUPABASE_ANON_KEY) and fully restart the app/Metro bundler.',
+    );
+  }
+
+  if (!env.supabaseUrl) {
+    throw new Error(
+      'Missing Supabase URL. Set EXPO_PUBLIC_SUPABASE_URL (or SUPABASE_URL) and fully restart the app/Metro bundler.',
+    );
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session?.access_token) {
+    throw new Error('Not authenticated. Please sign in again and retry.');
+  }
+
+  const accessToken = sessionData.session.access_token;
+  if (typeof accessToken !== 'string' || accessToken.length < 50 || !accessToken.startsWith('eyJ')) {
+    throw new Error('Invalid session token. Please sign out, sign in again, then retry.');
+  }
+
+  const functionUrl = `${env.supabaseUrl.replace(/\/$/, '')}/functions/v1/export-data`;
+  const res = await fetch(functionUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: env.supabaseAnonKey,
+      Authorization: `Bearer ${accessToken}`,
+      'x-client-info': 'export-data-flow',
+    },
+    body: JSON.stringify({}),
+  });
+
+  const contentDisposition = res.headers.get('content-disposition') ?? '';
+  const fileNameMatch = /filename="?([^";]+)"?/i.exec(contentDisposition);
+  const fileName = fileNameMatch?.[1] ?? `mutima-data-export.json`;
+
+  const contents = await res.text();
+
+  if (!res.ok) {
+    let message = `Failed to request data export (status ${res.status}).`;
+    try {
+      const parsed = JSON.parse(contents);
+      message = parsed?.error || parsed?.message || message;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
+  return { fileName, contents };
+};

@@ -15,6 +15,8 @@ export interface Profile {
   interests: string[];
   photos: string[]; // Cloudinary URLs
   is_complete: boolean;
+  is_verified?: boolean;
+  verified_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }

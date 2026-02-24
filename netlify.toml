@@ -1,7 +1,13 @@
 [build]
   publish = "reset-password-web"
+  functions = "netlify/functions"
 
 [[redirects]]
   from = "/reset-password"
   to = "/reset-password.html"
+  status = 200
+
+[[redirects]]
+  from = "/admin"
+  to = "/admin/index.html"
   status = 200

@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, Image } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, Button, TouchableOpacity, Alert, ActivityIndicator, SafeAreaView, Image, Share, Platform } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { INTEREST_TAGS } from '../../constants/interests';
 import { Gender, RelationshipGoal, GenderPreference } from '../../types/profile';
 import { uploadImageToCloudinary } from '../../utils/cloudinary';
 import { supabase } from '../../config/supabaseClient';
-import { deleteMyAccount } from '../../services/account';
+import { deleteMyAccount, requestMyDataExport } from '../../services/account';
 
 export type MyProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'MyProfile'>;
 
@@ -33,6 +34,12 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
   const [bio, setBio] = useState('');
   const [interests, setInterests] = useState<string[]>([]);
   const [localPhotos, setLocalPhotos] = useState<string[]>([]);
+
+  const isValidName = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    return /^[A-Za-z]+([ '\-][A-Za-z]+)*$/.test(trimmed);
+  };
 
   useEffect(() => {
     if (!profile) {
@@ -101,6 +108,10 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
   const validate = () => {
     if (!name.trim()) {
       Alert.alert('Invalid', 'Name is required.');
+      return false;
+    }
+    if (!isValidName()) {
+      Alert.alert('Invalid', "Name must contain letters only. You can use spaces, hyphens, and apostrophes.");
       return false;
     }
     if (!age || Number(age) < 18) {
@@ -214,6 +225,52 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
         },
       ],
     );
+  };
+
+  const handleExportMyData = async () => {
+    if (!user) return;
+    try {
+      const { fileName, contents } = await requestMyDataExport();
+
+      const baseDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory;
+      if (!baseDir) {
+        throw new Error('Missing local storage directory.');
+      }
+
+      const safeBaseDir = baseDir.endsWith('/') ? baseDir : `${baseDir}/`;
+      const localFileUri = `${safeBaseDir}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(localFileUri, contents, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      if (Platform.OS === 'android' && FileSystem.StorageAccessFramework) {
+        const perms = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (perms.granted) {
+          const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+            perms.directoryUri,
+            fileName,
+            'application/json',
+          );
+          await FileSystem.writeAsStringAsync(destUri, contents, {
+            encoding: FileSystem.EncodingType.UTF8,
+          });
+
+          Alert.alert('Saved', `Your export was saved as ${fileName}.`);
+          return;
+        }
+      }
+
+      await Share.share({
+        url: localFileUri,
+        message: 'Your Mutima data export is ready.',
+        title: 'Mutima data export',
+      });
+
+      Alert.alert('Saved', `Your export file is available as ${fileName}.`);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to request data export');
+    }
   };
 
   if (loading) {
@@ -490,6 +547,24 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
             activeOpacity={0.8}
           >
             <Text style={styles.supportButtonText}>Privacy Policy</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('RequestVerification')}
+            activeOpacity={0.8}
+            disabled={saving}
+          >
+            <Text style={styles.supportButtonText}>Request verification</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={handleExportMyData}
+            activeOpacity={0.8}
+            disabled={saving}
+          >
+            <Text style={styles.supportButtonText}>Export my data</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

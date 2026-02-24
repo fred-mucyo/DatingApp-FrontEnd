@@ -33,6 +33,12 @@ export const ProfileWizardScreen: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const isValidName = useMemo(() => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    return /^[A-Za-z]+([ '\-][A-Za-z]+)*$/.test(trimmed);
+  }, [name]);
+
   const progressLabel = useMemo(() => `Step ${step} of ${totalSteps}`, [step]);
 
   const toggleInterest = (tag: string) => {
@@ -77,7 +83,7 @@ export const ProfileWizardScreen: React.FC = () => {
   const canGoNext = () => {
     switch (step) {
       case 1:
-        return !!name && !!age && Number(age) >= 18 && !!city && !!country && bio.length <= 500;
+        return isValidName && !!age && Number(age) >= 18 && !!city && !!country && bio.length <= 500;
       case 2:
         return (
           !!relationshipGoal &&
@@ -94,6 +100,14 @@ export const ProfileWizardScreen: React.FC = () => {
 
   const handleNext = () => {
     if (!canGoNext()) {
+      if (step === 1 && !isValidName) {
+        Alert.alert('Invalid name', "Name must contain letters only. You can use spaces, hyphens, and apostrophes.");
+        return;
+      }
+      if (step === 3 && localPhotos.length < MIN_PHOTOS) {
+        Alert.alert('Add a photo', `Please add at least ${MIN_PHOTOS} profile photo to continue.`);
+        return;
+      }
       Alert.alert('Incomplete', 'Please complete this step before continuing.');
       return;
     }

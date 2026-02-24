@@ -34,6 +34,7 @@ interface ViewProfile {
   country: string | null;
   bio: string | null;
   photos: string[] | null;
+  is_verified?: boolean | null;
   relationship_goal?: string | null;
   gender_preference?: string | null;
   created_at?: string | null;
@@ -77,7 +78,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, username, name, age, city, country, bio, photos, relationship_goal, gender_preference, created_at, interests')
+          .select('id, username, name, age, city, country, bio, photos, relationship_goal, gender_preference, created_at, interests, is_verified')
           .eq('id', userId)
           .maybeSingle();
 
@@ -225,7 +226,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
       await sendPreMatchMessage(user.id, userId, message);
       Alert.alert(
         'Message sent',
-        `Your message was sent to ${displayName}. You can continue the conversation once you both match.`,
+        `Your message was sent to ${displayName}${verifiedTick}. You can continue the conversation once you both match.`,
       );
       setPreMatchVisible(false);
       setPreMatchMessage('');
@@ -337,6 +338,8 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   })();
 
   const displayName = profile.name ?? 'Someone';
+  const verifiedTick = profile.is_verified ? ' ✓' : '';
+
   const usernameLabel = profile.username ? `@${profile.username}` : undefined;
   const locationLabel = profile.city && profile.country ? `${profile.city}, ${profile.country}` : 'Location unknown';
   const interests = profile.interests && profile.interests.length > 0 ? profile.interests.slice(0, 6) : [];
@@ -493,10 +496,11 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             <View style={styles.nameSection}>
               <View style={styles.nameRow}>
                 <Text style={styles.nameText}>
-                  {displayName}
+                  {displayName}{verifiedTick}
                   {profile.age ? `, ${profile.age}` : ''}
                 </Text>
               </View>
+
               {usernameLabel && <Text style={styles.usernameText}>{usernameLabel}</Text>}
               <View style={styles.locationRow}>
                 <Text style={styles.locationIcon}>📍</Text>

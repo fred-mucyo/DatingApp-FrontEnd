@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MUTIMA Admin - Verification</title>
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <style>
+    :root { --bg:#0b1220; --card:#111a2e; --muted:#9ca3af; --text:#e5e7eb; --brand:#f97316; --danger:#ef4444; --ok:#10b981; }
+    body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial; background: linear-gradient(180deg, #0b1220, #070b14); color: var(--text); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom: 16px; }
+    h1 { font-size: 20px; margin:0; letter-spacing: .2px; }
+    .btn { border:0; background: var(--brand); color: white; padding: 10px 14px; border-radius: 10px; font-weight: 700; cursor:pointer; }
+    .btn.secondary { background: transparent; border:1px solid #27324a; color: var(--text); }
+    .grid { display:grid; grid-template-columns: 1fr; gap: 12px; }
+    .card { background: rgba(17,26,46,.9); border: 1px solid #223153; border-radius: 14px; padding: 14px; }
+    .row { display:flex; flex-wrap:wrap; gap: 10px 14px; align-items:center; }
+    .pill { font-size:12px; padding: 6px 10px; border-radius: 999px; border:1px solid #27324a; color: var(--muted); }
+    .pill.pending { color: #fbbf24; border-color: #4b3b12; }
+    .pill.approved { color: var(--ok); border-color: #124233; }
+    .pill.rejected { color: var(--danger); border-color: #4a1c1c; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .field { display:flex; flex-direction:column; gap:6px; margin-top: 10px; }
+    label { font-size: 12px; color: var(--muted); }
+    textarea { width: 100%; min-height: 70px; background: #0b1220; color: var(--text); border:1px solid #27324a; border-radius: 12px; padding: 10px; outline: none; }
+    select { background: #0b1220; color: var(--text); border:1px solid #27324a; border-radius: 12px; padding: 10px; outline:none; }
+    .actions { display:flex; gap:10px; margin-top: 12px; }
+    .btn.danger { background: var(--danger); }
+    .btn.ok { background: var(--ok); }
+    .imgs { display:flex; flex-wrap:wrap; gap: 10px; margin-top: 12px; }
+    .img { width: 240px; border-radius: 12px; border:1px solid #27324a; background:#0b1220; overflow:hidden; }
+    .img img { width:100%; height: 180px; object-fit: cover; display:block; }
+    .img .cap { padding: 8px 10px; font-size: 12px; color: var(--muted); }
+    .error { color: #fca5a5; font-size: 13px; }
+    .okmsg { color: #86efac; font-size: 13px; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>MUTIMA Admin - Verification Requests</h1>
+      <div class="row">
+        <span id="who" class="muted"></span>
+        <button id="login" class="btn secondary">Log in</button>
+        <button id="logout" class="btn secondary hidden">Log out</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="justify-content:space-between;">
+        <div class="row">
+          <span class="muted">Filter status:</span>
+          <select id="status">
+            <option value="pending">pending</option>
+            <option value="approved">approved</option>
+            <option value="rejected">rejected</option>
+          </select>
+          <button id="refresh" class="btn secondary">Refresh</button>
+        </div>
+        <div>
+          <span id="msg" class="muted"></span>
+        </div>
+      </div>
+      <div id="err" class="error" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="list" class="grid" style="margin-top:12px;"></div>
+  </div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  const state = { user: null };
+
+  function setMsg(t) { $('msg').textContent = t || ''; }
+  function setErr(t) { $('err').textContent = t || ''; }
+
+  async function api(path, opts) {
+    const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts && opts.headers ? opts.headers : {}) } });
+    const text = await res.text();
+    let json;
+    try { json = text ? JSON.parse(text) : {}; } catch { json = { error: text }; }
+    if (!res.ok) throw new Error(json.error || ('Request failed: ' + res.status));
+    return json;
+  }
+
+  function requireIdentityReady() {
+    if (!window.netlifyIdentity) throw new Error('Netlify Identity failed to load');
+  }
+
+  function updateAuthUI() {
+    const u = state.user;
+    $('login').classList.toggle('hidden', !!u);
+    $('logout').classList.toggle('hidden', !u);
+    $('who').textContent = u ? ('Logged in as: ' + (u.email || '')) : 'Not logged in';
+  }
+
+  async function loadList() {
+    setErr('');
+    setMsg('Loading...');
+    $('list').innerHTML = '';
+
+    const status = $('status').value;
+
+    try {
+      const data = await api('/.netlify/functions/verification-list?status=' + encodeURIComponent(status));
+      const items = data.requests || [];
+
+      if (items.length === 0) {
+        $('list').innerHTML = '<div class="card"><div class="muted">No requests.</div></div>';
+        setMsg('');
+        return;
+      }
+
+      for (const r of items) {
+        const el = document.createElement('div');
+        el.className = 'card';
+
+        const created = r.created_at ? new Date(r.created_at).toLocaleString() : '';
+        const reviewed = r.reviewed_at ? new Date(r.reviewed_at).toLocaleString() : '';
+
+        el.innerHTML = `
+          <div class="row" style="justify-content:space-between;">
+            <div class="row">
+              <span class="pill ${r.status}">${r.status}</span>
+              <span class="muted">Request: <b>${r.id}</b></span>
+            </div>
+            <div class="muted">Created: ${created}${reviewed ? ' | Reviewed: ' + reviewed : ''}</div>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <div class="muted">User ID: <b>${r.user_id}</b></div>
+            <div class="muted">Legal name: <b>${escapeHtml(r.legal_name || '')}</b></div>
+            <div class="muted">Document: <b>${escapeHtml(r.document_type || '')}</b></div>
+          </div>
+          <div class="field">
+            <label>Review notes (sent to user if rejected)</label>
+            <textarea data-notes></textarea>
+          </div>
+          <div class="actions">
+            <button class="btn ok" data-approve>Approve</button>
+            <button class="btn danger" data-reject>Reject</button>
+            <button class="btn secondary" data-view>View documents</button>
+          </div>
+          <div class="imgs" data-imgs></div>
+          <div class="muted" data-result style="margin-top:10px;"></div>
+        `;
+
+        const notesEl = el.querySelector('[data-notes]');
+        notesEl.value = r.review_notes || '';
+
+        el.querySelector('[data-approve]').addEventListener('click', async () => {
+          await review(r.id, 'approved', notesEl.value, el);
+        });
+        el.querySelector('[data-reject]').addEventListener('click', async () => {
+          await review(r.id, 'rejected', notesEl.value, el);
+        });
+        el.querySelector('[data-view]').addEventListener('click', async () => {
+          await loadImages(r, el);
+        });
+
+        $('list').appendChild(el);
+      }
+
+      setMsg('Loaded ' + items.length + ' request(s).');
+    } catch (e) {
+      setErr(e.message || String(e));
+      setMsg('');
+    }
+  }
+
+  async function review(requestId, decision, reviewNotes, container) {
+    setErr('');
+    const result = container.querySelector('[data-result]');
+    result.textContent = 'Submitting...';
+
+    try {
+      await api('/.netlify/functions/verification-review', {
+        method: 'POST',
+        body: JSON.stringify({ requestId, decision, reviewNotes: reviewNotes || null }),
+      });
+      result.innerHTML = '<span class="okmsg">Saved: ' + decision + '</span>';
+      await loadList();
+    } catch (e) {
+      result.innerHTML = '<span class="error">' + escapeHtml(e.message || String(e)) + '</span>';
+    }
+  }
+
+  async function loadImages(r, container) {
+    setErr('');
+    const box = container.querySelector('[data-imgs]');
+    box.innerHTML = '<div class="muted">Loading documents...</div>';
+
+    const paths = [r.id_front_path, r.id_back_path, r.selfie_path].filter(Boolean);
+    if (paths.length === 0) {
+      box.innerHTML = '<div class="muted">No document paths found.</div>';
+      return;
+    }
+
+    try {
+      const data = await api('/.netlify/functions/verification-signed-urls', {
+        method: 'POST',
+        body: JSON.stringify({ paths, expiresIn: 900 }),
+      });
+
+      const results = data.results || {};
+      box.innerHTML = '';
+
+      for (const p of paths) {
+        const item = results[p];
+        if (!item || !item.url) {
+          const d = document.createElement('div');
+          d.className = 'img';
+          d.innerHTML = '<div class="cap">Failed: ' + escapeHtml(p) + '</div>';
+          box.appendChild(d);
+          continue;
+        }
+
+        const d = document.createElement('div');
+        d.className = 'img';
+        d.innerHTML = `
+          <a href="${item.url}" target="_blank" rel="noreferrer">
+            <img src="${item.url}" alt="document" />
+          </a>
+          <div class="cap">${escapeHtml(p)}</div>
+        `;
+        box.appendChild(d);
+      }
+    } catch (e) {
+      box.innerHTML = '<div class="error">' + escapeHtml(e.message || String(e)) + '</div>';
+    }
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  // Identity boot
+  requireIdentityReady();
+
+  window.netlifyIdentity.on('init', (user) => {
+    state.user = user;
+    updateAuthUI();
+  });
+
+  window.netlifyIdentity.on('login', (user) => {
+    state.user = user;
+    updateAuthUI();
+    window.netlifyIdentity.close();
+    loadList();
+  });
+
+  window.netlifyIdentity.on('logout', () => {
+    state.user = null;
+    updateAuthUI();
+    $('list').innerHTML = '';
+  });
+
+  $('login').addEventListener('click', () => window.netlifyIdentity.open('login'));
+  $('logout').addEventListener('click', () => window.netlifyIdentity.logout());
+  $('refresh').addEventListener('click', loadList);
+  $('status').addEventListener('change', loadList);
+
+  window.netlifyIdentity.init();
+</script>
+</body>
+</html>

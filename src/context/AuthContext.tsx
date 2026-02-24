@@ -96,12 +96,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUpWithEmailPassword = async (email: string, password: string, username: string) => {
+    const trimmedUsername = (username ?? '').trim();
+    if (trimmedUsername.length < 3) {
+      Alert.alert('Sign-up error', 'Username must be at least 3 characters long.');
+      throw new Error('Invalid username');
+    }
+
+    if (!/^[a-zA-Z0-9_.-]+$/.test(trimmedUsername)) {
+      Alert.alert('Sign-up error', 'Username can contain letters, numbers, and . _ - only.');
+      throw new Error('Invalid username');
+    }
+
     // Enforce unique usernames
     const { data: existing, error: usernameError } = await supabase
       .from('profiles')
       .select('id')
-      .eq('username', username)
-      .maybeSingle();
+      .eq('username', trimmedUsername)
+      .limit(1);
 
     if (usernameError && usernameError.code !== 'PGRST116') {
       Alert.alert('Sign-up error', usernameError.message);
@@ -118,7 +129,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password,
       options: {
         data: {
-          username,
+          username: trimmedUsername,
         },
       },
     });
@@ -130,9 +141,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Also persist the username into the profiles table so username-based login can look it up.
     // We match on email here since handle_new_user has already created the minimal profile row.
+    const now = new Date().toISOString();
+    const consentVersion = '2026-02-24';
+
     const { error: profileError } = await supabase
       .from('profiles')
-      .update({ username })
+      .update({
+        username: trimmedUsername,
+        terms_accepted_at: now,
+        privacy_accepted_at: now,
+        consent_version: consentVersion,
+      })
       .eq('email', email);
 
     if (profileError) {

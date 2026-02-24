@@ -19,10 +19,21 @@ export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = () => {
             interests, photos), and messages you send in the app.
           </Text>
 
+          <Text style={styles.h2}>1.1 Controller and contact</Text>
+          <Text style={styles.p}>
+            Controller: Mutima. For privacy requests, contact: privacy@mutima.app.
+          </Text>
+
           <Text style={styles.h2}>2. How we use data</Text>
           <Text style={styles.p}>
             We use your data to provide matching, messaging, safety features (blocking/reporting), and to improve
             the app.
+          </Text>
+
+          <Text style={styles.h2}>2.1 Legal basis</Text>
+          <Text style={styles.p}>
+            We process data to provide the service you request (account and core app features). Where required, we
+            rely on your consent (for example, optional communications).
           </Text>
 
           <Text style={styles.h2}>3. Sharing</Text>
@@ -31,15 +42,39 @@ export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = () => {
             (e.g., hosting/storage) and when required by law.
           </Text>
 
+          <Text style={styles.h2}>3.1 Service providers</Text>
+          <Text style={styles.p}>
+            We use Supabase (authentication and database) and Cloudinary (photo storage) to provide the app.
+          </Text>
+
+          <Text style={styles.h2}>3.2 International transfers</Text>
+          <Text style={styles.p}>
+            Your data may be processed on infrastructure located outside Rwanda depending on our service providers.
+            We use contractual and technical safeguards to protect data during such transfers.
+          </Text>
+
           <Text style={styles.h2}>4. Security</Text>
           <Text style={styles.p}>
             We take reasonable measures to protect your data, but no method of transmission or storage is 100%
             secure.
           </Text>
 
+          <Text style={styles.h2}>4.1 Retention</Text>
+          <Text style={styles.p}>
+            We keep your profile and messages while your account is active. When you delete your account, we delete
+            your account data, except where we must retain limited information for legal, fraud-prevention, or safety
+            reasons.
+          </Text>
+
           <Text style={styles.h2}>5. Your choices</Text>
           <Text style={styles.p}>
             You can update your profile, block/report users, and request account deletion in the app.
+          </Text>
+
+          <Text style={styles.h2}>5.1 Your rights</Text>
+          <Text style={styles.p}>
+            You can request access, correction, deletion, and withdrawal of consent where applicable. To make a
+            request, contact privacy@mutima.app.
           </Text>
         </View>
       </ScrollView>
