@@ -119,6 +119,7 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({ navigation }) 
         ) : null}
         <Text style={styles.name}>
           {item.name}, {item.age}
+          {(item as any)?.is_verified ? <Text style={styles.verifiedTick}> ✓</Text> : null}
         </Text>
         <Text style={styles.meta}>
           {item.city}, {item.country}
@@ -200,6 +201,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+  },
+  verifiedTick: {
+    color: '#F97316',
+    fontWeight: '900',
   },
   meta: {
     fontSize: 12,

@@ -33,6 +33,26 @@ type VerificationRequest = {
 
 const BUCKET = 'verification-docs';
 
+const makeUuid = () => {
+  const cryptoObj: any = (globalThis as any).crypto;
+  if (cryptoObj && typeof cryptoObj.randomUUID === 'function') {
+    return cryptoObj.randomUUID();
+  }
+
+  const bytes = new Uint8Array(16);
+  if (cryptoObj && typeof cryptoObj.getRandomValues === 'function') {
+    cryptoObj.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+
+  // RFC4122 v4
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0'));
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+};
+
 export const RequestVerificationScreen: React.FC = () => {
   const { user, profile, refreshProfile } = useAuth();
 
@@ -136,46 +156,28 @@ export const RequestVerificationScreen: React.FC = () => {
 
     setSubmitting(true);
     try {
-      // Create request row first with temporary paths; we will update after uploads.
-      const { data: inserted, error: insertError } = await supabase
-        .from('verification_requests')
-        .insert({
-          user_id: user.id,
-          legal_name: legalName.trim(),
-          document_type: documentType,
-          status: 'pending',
-          review_notes: null,
-          id_front_path: 'pending',
-          id_back_path: null,
-          selfie_path: null,
-          // retention from submission until reviewed
-          documents_delete_after: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-        })
-        .select('*')
-        .single();
+      const requestId = makeUuid();
+
+      const frontPath = await uploadToBucket(requestId, idFrontUri as string, 'id-front.jpg');
+      const backPath = idBackUri ? await uploadToBucket(requestId, idBackUri, 'id-back.jpg') : null;
+      const selfiePath = selfieUri ? await uploadToBucket(requestId, selfieUri, 'selfie.jpg') : null;
+
+      const { error: insertError } = await supabase.from('verification_requests').insert({
+        id: requestId,
+        user_id: user.id,
+        legal_name: legalName.trim(),
+        document_type: documentType,
+        status: 'pending',
+        review_notes: null,
+        id_front_path: frontPath,
+        id_back_path: backPath,
+        selfie_path: selfiePath,
+        // retention from submission until reviewed
+        documents_delete_after: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      });
 
       if (insertError) {
         Alert.alert('Error', insertError.message);
-        return;
-      }
-
-      const request = inserted as VerificationRequest;
-
-      const frontPath = await uploadToBucket(request.id, idFrontUri as string, 'id-front.jpg');
-      const backPath = idBackUri ? await uploadToBucket(request.id, idBackUri, 'id-back.jpg') : null;
-      const selfiePath = selfieUri ? await uploadToBucket(request.id, selfieUri, 'selfie.jpg') : null;
-
-      const { error: updateError } = await supabase
-        .from('verification_requests')
-        .update({
-          id_front_path: frontPath,
-          id_back_path: backPath,
-          selfie_path: selfiePath,
-        })
-        .eq('id', request.id);
-
-      if (updateError) {
-        Alert.alert('Error', updateError.message);
         return;
       }
 

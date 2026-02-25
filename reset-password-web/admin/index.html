@@ -192,9 +192,14 @@
     const box = container.querySelector('[data-imgs]');
     box.innerHTML = '<div class="muted">Loading documents...</div>';
 
-    const paths = [r.id_front_path, r.id_back_path, r.selfie_path].filter(Boolean);
+    const allPaths = [r.id_front_path, r.id_back_path, r.selfie_path].filter(Boolean);
+    const paths = allPaths.filter((p) => typeof p === 'string' && p.trim().length > 0 && p !== 'pending');
     if (paths.length === 0) {
-      box.innerHTML = '<div class="muted">No document paths found.</div>';
+      if (allPaths.length > 0) {
+        box.innerHTML = '<div class="muted">Upload incomplete (document paths not available yet).</div>';
+      } else {
+        box.innerHTML = '<div class="muted">No document paths found.</div>';
+      }
       return;
     }
 
@@ -212,7 +217,7 @@
         if (!item || !item.url) {
           const d = document.createElement('div');
           d.className = 'img';
-          d.innerHTML = '<div class="cap">Failed: ' + escapeHtml(p) + '</div>';
+          d.innerHTML = '<div class="cap">Failed to load: ' + escapeHtml(p) + '</div>';
           box.appendChild(d);
           continue;
         }

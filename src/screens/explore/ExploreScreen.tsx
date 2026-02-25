@@ -26,6 +26,7 @@ interface ExploreProfile {
   city: string | null;
   country: string | null;
   photos: string[] | null;
+  is_verified: boolean | null;
 }
 
 const PAGE_SIZE = 10;
@@ -47,7 +48,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       const name = nameFilter.trim();
       let query = supabase
         .from('profiles')
-        .select('id, name, age, gender, city, country, photos')
+        .select('id, name, age, gender, city, country, photos, is_verified')
         .eq('is_complete', true)
         .neq('id', user.id)
         .order('created_at', { ascending: false })
@@ -79,7 +80,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       const base = () =>
         supabase
           .from('profiles')
-          .select('id, name, age, gender, city, country, photos')
+          .select('id, name, age, gender, city, country, photos, is_verified')
           .eq('is_complete', true)
           .neq('id', user.id)
           .order('created_at', { ascending: false });
@@ -232,6 +233,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           <Text style={styles.name} numberOfLines={1}>
             {item.name ?? 'Unknown'}
             {item.age ? `, ${item.age}` : ''}
+            {item.is_verified ? <Text style={styles.verifiedTick}> ✓</Text> : null}
           </Text>
           {(!!item.city || !!item.country) && (
             <View style={styles.locationRow}>
@@ -447,6 +449,10 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+  },
+  verifiedTick: {
+    color: '#F97316',
+    fontWeight: '900',
   },
   locationRow: {
     flexDirection: 'row',

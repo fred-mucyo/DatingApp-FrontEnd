@@ -737,6 +737,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.profileName}>
                   {item.name}, {item.age}
                 </Text>
+                {(item as any)?.is_verified ? <Text style={styles.verifiedTick}>✓</Text> : null}
                 {relationshipGoal && (
                   <View style={styles.intentBadge}>
                     <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={styles.intentBadgeIcon}>
@@ -1111,6 +1112,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1A1A',
     letterSpacing: -0.5,
+  },
+  verifiedTick: {
+    color: '#F97316',
+    fontWeight: '900',
+    fontSize: 18,
+    marginTop: 2,
   },
   intentBadge: {
     flexDirection: 'row',
