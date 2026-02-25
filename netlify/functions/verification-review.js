@@ -2,6 +2,29 @@ const { createClient } = require('@supabase/supabase-js');
 
 const ALLOWED_EMAILS = new Set(['mucyofred00@gmail.com', 'omutimahelpcenter@gmail.com']);
 
+const sendExpoPush = async (tokens, payload) => {
+  if (!Array.isArray(tokens) || tokens.length === 0) return { ok: true, sent: 0 };
+
+  const messages = tokens
+    .filter((t) => typeof t === 'string' && t.startsWith('ExponentPushToken'))
+    .map((to) => ({ to, sound: 'default', ...payload }));
+
+  if (messages.length === 0) return { ok: true, sent: 0 };
+
+  const res = await fetch('https://exp.host/--/api/v2/push/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(messages),
+  });
+
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Expo push send failed (${res.status}): ${text}`);
+  }
+
+  return { ok: true, sent: messages.length };
+};
+
 const json = (statusCode, body) => ({
   statusCode,
   headers: {
@@ -89,6 +112,34 @@ exports.handler = async (event, context) => {
       .eq('id', reqRow.user_id);
 
     if (pErr) return json(400, { error: pErr.message });
+  }
+
+  // Best-effort: notify user via Expo push (if they registered a token)
+  try {
+    const { data: tokenRows, error: tErr } = await admin
+      .from('push_tokens')
+      .select('token')
+      .eq('user_id', reqRow.user_id);
+
+    if (!tErr) {
+      const tokens = (tokenRows || []).map((r) => r.token);
+      const title = decision === 'approved' ? 'Verification approved' : 'Verification rejected';
+      const bodyText =
+        decision === 'approved'
+          ? 'You are now verified.'
+          : reviewNotes
+            ? `Reason: ${reviewNotes}`
+            : 'Please review your documents and try again.';
+
+      await sendExpoPush(tokens, {
+        title,
+        body: bodyText,
+        data: { type: 'verification_review', requestId, decision },
+      });
+    }
+  } catch (e) {
+    // Do not fail review if notification fails
+    console.log('[verification-review] push notify failed:', e && e.message ? e.message : String(e));
   }
 
   return json(200, { success: true });

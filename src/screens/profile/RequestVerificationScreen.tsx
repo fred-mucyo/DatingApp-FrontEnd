@@ -12,7 +12,9 @@ import {
   ScrollView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { supabase } from '../../config/supabaseClient';
+import { env } from '../../config/env';
 import { useAuth } from '../../context/AuthContext';
 
 type VerificationStatus = 'pending' | 'approved' | 'rejected';
@@ -134,15 +136,42 @@ export const RequestVerificationScreen: React.FC = () => {
 
     const path = `${user.id}/${requestId}/${fileName}`;
 
-    const res = await fetch(localUri);
-    const blob = await res.blob();
+    let uploadUri = localUri;
+    if (typeof uploadUri === 'string' && !uploadUri.startsWith('file://')) {
+      const tmpPath = `${FileSystem.cacheDirectory ?? ''}${requestId}-${fileName}`;
+      if (!tmpPath) {
+        throw new Error('Could not prepare file for upload');
+      }
+      await FileSystem.copyAsync({ from: uploadUri, to: tmpPath });
+      uploadUri = tmpPath;
+    }
 
-    const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-      upsert: true,
-      contentType: blob.type || 'image/jpeg',
+    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionData.session) {
+      throw new Error('Not authenticated');
+    }
+
+    const accessToken = sessionData.session.access_token;
+    const supabaseUrl = env.supabaseUrl;
+    const anonKey = env.supabaseAnonKey;
+    if (!supabaseUrl || !anonKey) throw new Error('Missing Supabase configuration');
+
+    const targetUrl = `${supabaseUrl}/storage/v1/object/${BUCKET}/${encodeURIComponent(path).replaceAll('%2F', '/')}`;
+
+    const res = await FileSystem.uploadAsync(targetUrl, uploadUri, {
+      httpMethod: 'PUT',
+      uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        apikey: anonKey,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true',
+      },
     });
 
-    if (error) throw new Error(error.message);
+    if (res.status < 200 || res.status >= 300) {
+      throw new Error(`Upload failed (${res.status}): ${res.body || ''}`);
+    }
 
     return path;
   };
