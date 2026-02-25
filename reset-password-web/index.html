@@ -4,7 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>MUTIMA</title>
-    <meta http-equiv="refresh" content="0; url=/reset-password" />
+    <script>
+      (function () {
+        var hash = window.location.hash || '';
+
+        var isNetlifyIdentityFlow =
+          hash.indexOf('invite_token=') !== -1 ||
+          hash.indexOf('confirmation_token=') !== -1 ||
+          hash.indexOf('recovery_token=') !== -1;
+
+        var target = isNetlifyIdentityFlow ? '/admin' : '/reset-password';
+        window.location.replace(target + hash);
+      })();
+    </script>
   </head>
   <body>
     Redirecting…
