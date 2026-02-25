@@ -25,6 +25,71 @@ interface CachedSuggestions {
   profiles: SuggestionProfile[];
 }
 
+const normalizePhotosField = (value: unknown): string[] => {
+  const extractOne = (v: unknown): string | null => {
+    if (!v) return null;
+    if (typeof v === 'string') {
+      const t = v.trim();
+      return t ? t : null;
+    }
+
+    if (typeof v === 'object') {
+      const anyV = v as any;
+      const candidate =
+        (typeof anyV.secure_url === 'string' && anyV.secure_url) ||
+        (typeof anyV.url === 'string' && anyV.url) ||
+        (typeof anyV.uri === 'string' && anyV.uri) ||
+        (typeof anyV.path === 'string' && anyV.path) ||
+        null;
+      if (candidate && typeof candidate === 'string') {
+        const t = candidate.trim();
+        return t ? t : null;
+      }
+    }
+
+    return null;
+  };
+
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    const out: string[] = [];
+    for (const entry of value) {
+      const one = extractOne(entry);
+      if (one) out.push(one);
+    }
+    return out;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    // Sometimes arrays are stored/returned as JSON strings.
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          const out: string[] = [];
+          for (const entry of parsed) {
+            const one = extractOne(entry);
+            if (one) out.push(one);
+          }
+          return out;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Otherwise treat as a single URL.
+    return [trimmed];
+  }
+
+  const one = extractOne(value);
+  return one ? [one] : [];
+};
+
 // Very small helper: read list of profile ids the user has explicitly passed on (locally, per user).
 const getPassedProfileIds = async (userId: string): Promise<string[]> => {
   const raw = await AsyncStorage.getItem(`${PASSED_IDS_KEY}:${userId}`);
@@ -58,14 +123,13 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
   if (sErr || !sessionData.session) throw new Error('Not authenticated');
   const me = sessionData.session.user.id;
 
-  // Load current user's profile so we can order (not filter) by preferences.
-  const { data: myProfile } = await supabase
-    .from('profiles')
-    .select('gender, gender_preference, city, country, relationship_goal, interests')
-    .eq('id', me)
-    .maybeSingle();
-
-  const [likesRes, blocksRes, passedIds] = await Promise.all([
+  // Run the independent reads in parallel to minimize latency.
+  const [myProfileRes, likesRes, blocksRes, passedIds] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('gender, gender_preference, city, country, relationship_goal, interests')
+      .eq('id', me)
+      .maybeSingle(),
     supabase.from('likes').select('liked_id').eq('liker_id', me),
     supabase
       .from('blocks')
@@ -73,6 +137,8 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
       .or(`blocker_id.eq.${me},blocked_id.eq.${me}`),
     getPassedProfileIds(me),
   ]);
+
+  const myProfile = myProfileRes?.data ?? null;
 
   const likedIds = ((likesRes.data as any[]) ?? [])
     .map((row) => row.liked_id as string | null)
@@ -90,14 +156,22 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
 
   const toQuotedInList = (ids: string[]) => `(${ids.map((id) => `"${id}"`).join(',')})`;
 
+  const myGenderPref = (myProfile as any)?.gender_preference as string | null;
+  const strictGenderPref =
+    myGenderPref === 'male' || myGenderPref === 'female' || myGenderPref === 'other' ? myGenderPref : null;
+
   let profilesQuery = supabase
     .from('profiles')
     .select(
-      'id, name, age, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos, is_verified',
+      'id, name, age, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos, photos, is_verified',
     )
     .neq('id', me)
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
+
+  if (strictGenderPref) {
+    profilesQuery = profilesQuery.eq('gender', strictGenderPref);
+  }
 
   if (likedIds.length > 0) {
     profilesQuery = profilesQuery.not('id', 'in', toQuotedInList(likedIds));
@@ -112,19 +186,33 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
   const { data: profilesPage, error: profilesErr } = await profilesQuery;
   if (profilesErr) throw profilesErr;
 
-  const candidates = (profilesPage as any[]) ?? [];
+  const rawCandidates = (profilesPage as any[]) ?? [];
+  const candidates = rawCandidates.map((p) => {
+    const rawProfilePhotos = (p as any).profile_photos as unknown;
+    const rawPhotos = (p as any).photos as unknown;
+
+    const profilePhotos = normalizePhotosField(rawProfilePhotos);
+    const photos = normalizePhotosField(rawPhotos);
+
+    const resolvedPhotos = profilePhotos.length > 0 ? profilePhotos : photos.length > 0 ? photos : null;
+
+    return {
+      ...(p as any),
+      profile_photos: resolvedPhotos,
+    } as SuggestionProfile;
+  });
 
   const myCity = (myProfile as any)?.city as string | null;
   const myCountry = (myProfile as any)?.country as string | null;
   const myGoal = (myProfile as any)?.relationship_goal as string | null;
-  const myGenderPref = (myProfile as any)?.gender_preference as string | null;
+  const myGenderPrefForScore = myGenderPref;
 
   const scored = candidates.map((p) => {
     let score = 0;
     if (myCity && p.city === myCity) score += 4;
     if (!score && myCountry && p.country === myCountry) score += 2;
     if (myGoal && p.relationship_goal === myGoal) score += 1;
-    if (myGenderPref && p.gender === myGenderPref) score += 1;
+    if (myGenderPrefForScore && p.gender === myGenderPrefForScore) score += 1;
     return { profile: p as SuggestionProfile, score };
   });
 

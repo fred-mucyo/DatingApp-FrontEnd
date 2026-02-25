@@ -103,10 +103,28 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const loadSuggestions = useCallback(async () => {
     if (!user) return;
 
+    const normalizeSuggestionPhotos = (items: SuggestionProfile[]): SuggestionProfile[] => {
+      return (items ?? []).map((it) => {
+        const anyIt: any = it as any;
+        const resolved = (() => {
+          const primary = normalizePhotosField(anyIt.profile_photos);
+          if (primary.length > 0) return primary;
+          const fallback = normalizePhotosField(anyIt.photos);
+          return fallback.length > 0 ? fallback : null;
+        })();
+        return {
+          ...(it as any),
+          profile_photos: resolved,
+        } as SuggestionProfile;
+      });
+    };
+
     // Load cached suggestions immediately
-    const cached = await cacheService.getSuggestions(user.id);
+    const cachedRaw = await cacheService.getSuggestions(user.id);
     const cachedIndex = await cacheService.getSuggestionIndex(user.id);
     
+    const cached = cachedRaw ? normalizeSuggestionPhotos(cachedRaw) : cachedRaw;
+
     if (cached && cached.length > 0) {
       // Rotate/shuffle suggestions for variety
       const shuffled = shuffleArray(cached);
@@ -125,57 +143,11 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     try {
       // Load fresh suggestions in background
       const data = await getDailySuggestions(5, 30);
-      
-      // If RPC didn't include photos, enrich from profiles table (in batches for performance)
-      const batchSize = 5;
-      const enriched: SuggestionProfile[] = [];
-      
-      for (let i = 0; i < (data ?? []).length; i += batchSize) {
-        const batch = (data ?? []).slice(i, i + batchSize);
-        const enrichedBatch = await Promise.all(
-          batch.map(async (p) => {
-            const anyP: any = p as any;
-            const rawProfilePhotos = anyP.profile_photos;
 
-            const hasPhotosArray =
-              Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0;
-            const hasPhotosString =
-              typeof rawProfilePhotos === 'string' && !!rawProfilePhotos;
+      const normalizedFresh = normalizeSuggestionPhotos((data ?? []) as SuggestionProfile[]);
 
-            if (hasPhotosArray || hasPhotosString) {
-              return p;
-            }
-
-            try {
-              const { data: prof, error } = await supabase
-                .from('profiles')
-                .select('photos')
-                .eq('id', p.id)
-                .maybeSingle();
-
-              if (
-                !error &&
-                prof &&
-                Array.isArray(prof.photos) &&
-                prof.photos.length > 0
-              ) {
-                return {
-                  ...p,
-                  profile_photos: prof.photos,
-                } as SuggestionProfile;
-              }
-            } catch (err) {
-              console.log('HOME enrich suggestion error:', { id: p.id, err });
-            }
-
-            return p;
-          }),
-        );
-        enriched.push(...enrichedBatch);
-      }
-      
       // Rotate/shuffle for variety
-      const shuffled = shuffleArray(enriched);
+      const shuffled = shuffleArray(normalizedFresh);
       setSuggestions(shuffled);
       await cacheService.setSuggestions(user.id, shuffled);
       
@@ -213,7 +185,24 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const cachedIndex = await cacheService.getSuggestionIndex(user.id);
       
       if (cached && cached.length > 0) {
-        const shuffled = shuffleArray(cached);
+        const normalizeSuggestionPhotos = (items: SuggestionProfile[]): SuggestionProfile[] => {
+          return (items ?? []).map((it) => {
+            const anyIt: any = it as any;
+            const resolved = (() => {
+              const primary = normalizePhotosField(anyIt.profile_photos);
+              if (primary.length > 0) return primary;
+              const fallback = normalizePhotosField(anyIt.photos);
+              return fallback.length > 0 ? fallback : null;
+            })();
+            return {
+              ...(it as any),
+              profile_photos: resolved,
+            } as SuggestionProfile;
+          });
+        };
+
+        const normalized = normalizeSuggestionPhotos(cached);
+        const shuffled = shuffleArray(normalized);
         setSuggestions(shuffled);
         const startIndex = cachedIndex !== null && cachedIndex < shuffled.length 
           ? cachedIndex 
@@ -631,10 +620,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const ExploreNavIcon = () => (
     <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
       <Circle cx={12} cy={12} r={9} stroke="#FFFFFF" strokeWidth={2} />
-      <Path
-        d="M10 14l1.2-3.8L15 9l-1.2 3.8L10 14Z"
-        fill="#FFFFFF"
-      />
+      <Path d="M10 14l1.2-3.8L15 9l-1.2 3.8L10 14Z" fill="#FFFFFF" />
     </Svg>
   );
 
@@ -672,27 +658,79 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     return goalMap[goal.toLowerCase()] || goal.charAt(0).toUpperCase() + goal.slice(1);
   };
 
+  const normalizePhotosField = (value: unknown): string[] => {
+    const extractOne = (v: unknown): string | null => {
+      if (!v) return null;
+
+      if (typeof v === 'string') {
+        const t = v.trim();
+        return t ? t : null;
+      }
+
+      if (typeof v === 'object') {
+        const anyV = v as any;
+        const candidate =
+          (typeof anyV.secure_url === 'string' && anyV.secure_url) ||
+          (typeof anyV.url === 'string' && anyV.url) ||
+          (typeof anyV.uri === 'string' && anyV.uri) ||
+          (typeof anyV.path === 'string' && anyV.path) ||
+          null;
+        if (candidate && typeof candidate === 'string') {
+          const t = candidate.trim();
+          return t ? t : null;
+        }
+      }
+
+      return null;
+    };
+
+    if (!value) return [];
+
+    if (Array.isArray(value)) {
+      const out: string[] = [];
+      for (const entry of value) {
+        const one = extractOne(entry);
+        if (one) out.push(one);
+      }
+      return out;
+    }
+
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return [];
+
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            const out: string[] = [];
+            for (const entry of parsed) {
+              const one = extractOne(entry);
+              if (one) out.push(one);
+            }
+            return out;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      return [trimmed];
+    }
+
+    const one = extractOne(value);
+    return one ? [one] : [];
+  };
+
   const renderSuggestionItem = ({ item }: { item: SuggestionProfile }) => {
     const alreadyLiked = locallyLikedIds.includes(item.id);
     const anyItem: any = item as any;
-    const rawProfilePhotos = anyItem.profile_photos;
-    const rawPhotos = anyItem.photos;
 
-    const photos: string[] = [];
-
-    if (Array.isArray(rawProfilePhotos) && rawProfilePhotos.length > 0) {
-      photos.push(...rawProfilePhotos.filter((p: any) => typeof p === 'string'));
-    } else if (typeof rawProfilePhotos === 'string' && rawProfilePhotos) {
-      photos.push(rawProfilePhotos);
-    }
-
-    if (photos.length === 0) {
-      if (Array.isArray(rawPhotos) && rawPhotos.length > 0) {
-        photos.push(...rawPhotos.filter((p: any) => typeof p === 'string'));
-      } else if (typeof rawPhotos === 'string' && rawPhotos) {
-        photos.push(rawPhotos);
-      }
-    }
+    const photos = (() => {
+      const primary = normalizePhotosField(anyItem.profile_photos);
+      if (primary.length > 0) return primary;
+      return normalizePhotosField(anyItem.photos);
+    })();
 
     const primaryPhoto = photos.length > 0 ? photos[0] : null;
     const interests = Array.isArray(item.interests) ? item.interests.filter(Boolean) : [];
@@ -702,77 +740,72 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.cardWrapper}>
         {/* Profile Card */}
         <View style={styles.profileCard}>
-            {/* Photo Container */}
-            <View style={styles.photoContainer}>
-              {primaryPhoto ? (
-                <View style={styles.imageWrapper}>
-                  <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
-                </View>
-              ) : (
-                <View style={[styles.profilePhoto, styles.photoPlaceholder]}>
-                  <Text style={styles.photoPlaceholderText}>No Photo</Text>
-                </View>
-              )}
-              
-              {/* Info Button (top-left) */}
-              <TouchableOpacity
-                style={styles.photoInfoButton}
-                onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
-              >
-                <InfoIcon />
-              </TouchableOpacity>
-
-              {/* Share Button (top-right) */}
-              <TouchableOpacity
-                style={styles.photoShareButton}
-                onPress={handleShare}
-              >
-                <ShareIcon />
-              </TouchableOpacity>
-            </View>
-
-            {/* Profile Info */}
-            <View style={styles.profileInfo}>
-              <View style={styles.nameRow}>
-                <Text style={styles.profileName}>
-                  {item.name}, {item.age}
-                </Text>
-                {(item as any)?.is_verified ? <Text style={styles.verifiedTick}>✓</Text> : null}
-                {relationshipGoal && (
-                  <View style={styles.intentBadge}>
-                    <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={styles.intentBadgeIcon}>
-                      <Path
-                        d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
-                        fill="#FFFFFF"
-                      />
-                    </Svg>
-                    <Text style={styles.intentBadgeText}>{relationshipGoal}</Text>
-                  </View>
-                )}
+          {/* Photo Container */}
+          <View style={styles.photoContainer}>
+            {primaryPhoto ? (
+              <View style={styles.imageWrapper}>
+                <Image source={{ uri: primaryPhoto }} style={styles.profilePhoto} resizeMode="cover" />
               </View>
-
-              <View style={styles.locationRow}>
-                <LocationIcon />
-                <Text style={styles.locationText}>
-                  {item.city} / {item.country}
-                </Text>
+            ) : (
+              <View style={[styles.profilePhoto, styles.photoPlaceholder]}>
+                <Text style={styles.photoPlaceholderText}>No Photo</Text>
               </View>
+            )}
 
-              {item.bio && (
-                <Text style={styles.bioText}>{item.bio}</Text>
-              )}
+            {/* Info Button (top-left) */}
+            <TouchableOpacity
+              style={styles.photoInfoButton}
+              onPress={() => navigation.navigate('ViewUserProfile', { userId: item.id })}
+            >
+              <InfoIcon />
+            </TouchableOpacity>
 
-              {interests.length > 0 && (
-                <View style={styles.interestsContainer}>
-                  {interests.slice(0, 4).map((interest, index) => (
-                    <View key={index} style={styles.interestTag}>
-                      <Text style={styles.interestTagText}>{interest}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
+            {/* Share Button (top-right) */}
+            <TouchableOpacity style={styles.photoShareButton} onPress={handleShare}>
+              <ShareIcon />
+            </TouchableOpacity>
           </View>
+
+          {/* Profile Info */}
+          <View style={styles.profileInfo}>
+            <View style={styles.nameRow}>
+              <Text style={styles.profileName}>
+                {item.name}, {item.age}
+              </Text>
+              {(item as any)?.is_verified ? <Text style={styles.verifiedTick}>✓</Text> : null}
+              {relationshipGoal && (
+                <View style={styles.intentBadge}>
+                  <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={styles.intentBadgeIcon}>
+                    <Path
+                      d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
+                      fill="#FFFFFF"
+                    />
+                  </Svg>
+                  <Text style={styles.intentBadgeText}>{relationshipGoal}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.locationRow}>
+              <LocationIcon />
+              <Text style={styles.locationText}>
+                {item.city} / {item.country}
+              </Text>
+            </View>
+
+            {item.bio && <Text style={styles.bioText}>{item.bio}</Text>}
+
+            {interests.length > 0 && (
+              <View style={styles.interestsContainer}>
+                {interests.slice(0, 4).map((interest, index) => (
+                  <View key={index} style={styles.interestTag}>
+                    <Text style={styles.interestTagText}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
 
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
@@ -784,10 +817,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <PassIcon />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.messageButton]}
-            onPress={() => handleMessage(item.id)}
-          >
+          <TouchableOpacity style={[styles.actionButton, styles.messageButton]} onPress={() => handleMessage(item.id)}>
             <MessageIcon />
           </TouchableOpacity>
 
@@ -821,13 +851,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.emptyStateContainer}>
             <Text style={styles.emptyIcon}>💫</Text>
             <Text style={styles.emptyTitle}>You're All Caught Up!</Text>
-            <Text style={styles.emptySubtitle}>
-              Check back tomorrow for fresh connections
-            </Text>
-            <TouchableOpacity
-              style={styles.exploreButton}
-              onPress={() => navigation.navigate('Explore')}
-            >
+            <Text style={styles.emptySubtitle}>Check back tomorrow for fresh connections</Text>
+            <TouchableOpacity style={styles.exploreButton} onPress={() => navigation.navigate('Explore')}>
               <Text style={styles.exploreButtonText}>Explore More</Text>
             </TouchableOpacity>
           </View>
@@ -870,11 +895,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             >
               <View style={styles.navIconCircle}>
                 <LikesNavIcon />
-                <Badge
-                  count={newLikesCount}
-                  color="#EC4899"
-                  accessibilityLabel={`${newLikesCount} new likes`}
-                />
+                <Badge count={newLikesCount} color="#EC4899" accessibilityLabel={`${newLikesCount} new likes`} />
               </View>
               <Text style={styles.navLabel}>Likes</Text>
             </TouchableOpacity>
@@ -920,12 +941,8 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         >
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>
-                Message {preMatchTarget?.name ?? 'this person'}
-              </Text>
-              <Text style={styles.modalSubtitle}>
-                You can send one message before you match. Make it count.
-              </Text>
+              <Text style={styles.modalTitle}>Message {preMatchTarget?.name ?? 'this person'}</Text>
+              <Text style={styles.modalSubtitle}>You can send one message before you match. Make it count.</Text>
               <TextInput
                 style={styles.modalInput}
                 multiline
