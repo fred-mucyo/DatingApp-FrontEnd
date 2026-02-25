@@ -80,7 +80,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <View style={styles.gradientBackground}>
             {/* Compact Header */}
             <View style={styles.headerArea}>
-              <Text style={styles.appName}>Mutima</Text>
+              <Text style={styles.appName}>Umutima</Text>
               <View style={styles.betaBadge}>
                 <Text style={styles.betaText}></Text>
               </View>

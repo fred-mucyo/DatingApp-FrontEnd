@@ -100,7 +100,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{ title: 'MUTIMA - Login' }}
+            options={{ title: 'UMUTIMA - Login' }}
           />
           <Stack.Screen
             name="SignUp"
@@ -141,7 +141,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: 'MUTIMA' }}
+            options={{ title: 'UMUTIMA' }}
           />
           <Stack.Screen
             name="ResetPassword"

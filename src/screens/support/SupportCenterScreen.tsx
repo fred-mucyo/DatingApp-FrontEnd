@@ -5,7 +5,7 @@ const SUPPORT_EMAIL = 'omutimahelpcenter@gmail.com';
 
 export const SupportCenterScreen: React.FC = () => {
   const handleEmailPress = () => {
-    const subject = encodeURIComponent('MUTIMA Support Request');
+    const subject = encodeURIComponent('UMUTIMA Support Request');
     const mailto = `mailto:${SUPPORT_EMAIL}?subject=${subject}`;
     Linking.openURL(mailto).catch(() => {
       // silent fail; no alerts to keep UX simple
@@ -16,7 +16,7 @@ export const SupportCenterScreen: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.title}>Support Center</Text>
-        <Text style={styles.subtitle}>We are here to help you with MUTIMA.</Text>
+        <Text style={styles.subtitle}>We are here to help you with UMUTIMA.</Text>
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Contact us</Text>

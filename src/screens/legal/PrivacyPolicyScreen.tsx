@@ -21,7 +21,7 @@ export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = () => {
 
           <Text style={styles.h2}>1.1 Controller and contact</Text>
           <Text style={styles.p}>
-            Controller: Mutima. For privacy requests, contact: privacy@mutima.app.
+            Controller: Umutima. For privacy requests, contact: omutimahelpcenter@gmail.com.
           </Text>
 
           <Text style={styles.h2}>2. How we use data</Text>
@@ -74,7 +74,7 @@ export const PrivacyPolicyScreen: React.FC<PrivacyPolicyScreenProps> = () => {
           <Text style={styles.h2}>5.1 Your rights</Text>
           <Text style={styles.p}>
             You can request access, correction, deletion, and withdrawal of consent where applicable. To make a
-            request, contact privacy@mutima.app.
+            request, contact omutimahelpcenter@gmail.com.
           </Text>
         </View>
       </ScrollView>

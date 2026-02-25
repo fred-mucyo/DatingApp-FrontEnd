@@ -15,12 +15,12 @@ export const TermsOfServiceScreen: React.FC<TermsOfServiceScreenProps> = () => {
         <View style={styles.card}>
           <Text style={styles.h2}>1. Overview</Text>
           <Text style={styles.p}>
-            Mutima is a social and dating platform. By using the app you agree to these Terms.
+            Umutima is a social and dating platform. By using the app you agree to these Terms.
           </Text>
 
           <Text style={styles.h2}>2. Eligibility</Text>
           <Text style={styles.p}>
-            You must be at least 18 years old to use Mutima.
+            You must be at least 18 years old to use Umutima.
           </Text>
 
           <Text style={styles.h2}>3. Safety</Text>

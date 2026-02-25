@@ -263,8 +263,8 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
 
       await Share.share({
         url: localFileUri,
-        message: 'Your Mutima data export is ready.',
-        title: 'Mutima data export',
+        message: 'Your Umutima data export is ready.',
+        title: 'Umutima data export',
       });
 
       Alert.alert('Saved', `Your export file is available as ${fileName}.`);

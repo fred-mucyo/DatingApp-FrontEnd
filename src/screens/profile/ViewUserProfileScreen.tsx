@@ -240,10 +240,10 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   const handleShareProfile = async () => {
     if (!profile) return;
     try {
-      const name = profile.name ?? 'MUTIMA user';
+      const name = profile.name ?? 'UMUTIMA user';
       const username = profile.username ? `@${profile.username}` : '';
       await Share.share({
-        message: `Check out ${name} ${username} on MUTIMA.`.trim(),
+        message: `Check out ${name} ${username} on UMUTIMA.`.trim(),
       });
     } catch {
       // ignore share errors

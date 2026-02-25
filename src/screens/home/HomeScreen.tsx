@@ -381,7 +381,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       const url = 'https://hashye.online/mutima-info';
       await Share.share({
         message: `Check out this amazing dating app! Download now and find your match\n\nLearn more: ${url}`,
-        title: 'Mutima',
+        title: 'Umutima',
       });
     } catch (error) {
       console.log('Error sharing:', error);

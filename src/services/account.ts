@@ -147,7 +147,7 @@ export const requestMyDataExport = async (): Promise<{ fileName: string; content
 
   const contentDisposition = res.headers.get('content-disposition') ?? '';
   const fileNameMatch = /filename="?([^";]+)"?/i.exec(contentDisposition);
-  const fileName = fileNameMatch?.[1] ?? `mutima-data-export.json`;
+  const fileName = fileNameMatch?.[1] ?? `umutima-data-export.json`;
 
   const contents = await res.text();
 

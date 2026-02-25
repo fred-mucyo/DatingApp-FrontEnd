@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
 
     const json = JSON.stringify(exportPayload, null, 2);
     const safeDate = new Date().toISOString().slice(0, 10);
-    const fileName = `mutima-data-export-${safeDate}.json`;
+    const fileName = `umutima-data-export-${safeDate}.json`;
     return fileResponse(fileName, json);
   } catch (e) {
     return jsonResponse(500, { error: e instanceof Error ? e.message : String(e) });
