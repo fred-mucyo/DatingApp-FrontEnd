@@ -14,7 +14,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  StatusBar,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +56,37 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
   const [reportDescription, setReportDescription] = useState('');
   const [submittingReport, setSubmittingReport] = useState(false);
   const flatListRef = useRef<FlatList<MessageItem>>(null);
+
+  const BackIcon = ({ color = '#111827' }: { color?: string }) => (
+    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M15 18l-6-6 6-6"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const SendIcon = ({ color = '#FFFFFF' }: { color?: string }) => (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M22 2 11 13"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M22 2 15 22l-4-9-9-4 20-7Z"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
 
   const handleUnmatch = async () => {
     if (!user) return;
@@ -301,7 +334,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
     const isDelivered = !!message.delivered_at;
 
     // 1 tick = sent, 2 ticks = delivered, 2 orange ticks = read
-    const tickColor = isRead ? '#F97316' : '#9CA3AF'; // Primary color if read, gray if not
+    const tickColor = isRead ? '#ff4b2b' : '#9CA3AF'; // Primary color if read, gray if not
     const tickCount = isDelivered ? 2 : 1;
 
     return (
@@ -414,7 +447,7 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
             activeOpacity={0.8}
             onPress={() => navigation.navigate('Matches')}
           >
-            <Text style={styles.headerIcon}>←</Text>
+            <BackIcon color="#111827" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.headerCenter}
@@ -552,7 +585,13 @@ export const ChatScreen: React.FC<ChatScreenProps> = ({ route, navigation }) => 
               onPress={handleSend}
               disabled={sending || !input.trim() || limitReached}
             >
-              <Text style={styles.sendButtonIcon}>{sending ? '…' : '➤'}</Text>
+              <View style={styles.sendButtonIconWrap}>
+                {sending ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <SendIcon />
+                )}
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -719,6 +758,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight ?? 0) : 0,
   },
   container: {
     flex: 1,
@@ -942,14 +982,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
   },
   sendButtonDisabled: {
     backgroundColor: '#D1D5DB',
   },
-  sendButtonIcon: {
-    fontSize: 18,
-    color: '#FFFFFF',
+  sendButtonIconWrap: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   center: {
     flex: 1,

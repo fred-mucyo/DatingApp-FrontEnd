@@ -6,6 +6,8 @@ import { Profile } from '../types/profile';
 import { cacheService } from '../services/cache';
 import * as Linking from 'expo-linking';
 import Constants from 'expo-constants';
+import { useToast } from '../components/Toast';
+
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
@@ -14,6 +16,7 @@ interface AuthContextValue {
   profileLoading: boolean;
   signUpWithEmailPassword: (email: string, password: string, username: string) => Promise<void>;
   signInWithIdentifierPassword: (identifier: string, password: string) => Promise<void>;
+  getUsernameSuggestions: (desiredUsername: string, limit?: number) => Promise<string[]>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -27,6 +30,85 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const toast = useToast();
+
+  const normalizeUsernameForSuggestion = (value: string): string => {
+    const raw = (value ?? '').trim().toLowerCase();
+    if (!raw) return '';
+
+    const filtered = raw.replace(/[^a-z0-9_.-]/g, '');
+    const collapsed = filtered.replace(/[._-]{2,}/g, (m) => m[0]);
+    const trimmed = collapsed.replace(/^[._-]+/, '').replace(/[._-]+$/, '');
+    return trimmed;
+  };
+
+  const generateUsernameCandidates = (base: string, desiredCount: number): string[] => {
+    const out: string[] = [];
+    const root = normalizeUsernameForSuggestion(base);
+    if (!root) return out;
+
+    const safeRoot = root.length > 20 ? root.slice(0, 20) : root;
+    const cleaned = safeRoot.replace(/^[0-9]+/, '');
+    const finalRoot = cleaned.length >= 3 ? cleaned : safeRoot;
+    if (finalRoot.length < 3) return out;
+
+    const add = (candidate: string) => {
+      const c = candidate.trim();
+      if (c.length < 3) return;
+      if (!/^[a-z0-9_.-]+$/.test(c)) return;
+      if (!out.includes(c)) out.push(c);
+    };
+
+    add(finalRoot);
+
+    const suffixes: string[] = [];
+    for (let i = 2; i <= 9; i += 1) suffixes.push(String(i));
+    for (let i = 10; i <= 99; i += 1) suffixes.push(String(i));
+
+    const patterns = [
+      (s: string) => `${finalRoot}${s}`,
+      (s: string) => `${finalRoot}_${s}`,
+      (s: string) => `${finalRoot}.${s}`,
+    ];
+
+    for (const s of suffixes) {
+      for (const p of patterns) {
+        add(p(s));
+        if (out.length >= desiredCount) return out;
+      }
+    }
+
+    return out;
+  };
+
+  const getUsernameSuggestions = async (desiredUsername: string, limit = 6): Promise<string[]> => {
+    const base = normalizeUsernameForSuggestion(desiredUsername);
+    if (!base || base.length < 3) return [];
+
+    const candidates = generateUsernameCandidates(base, Math.max(limit * 4, 24));
+    if (candidates.length === 0) return [];
+
+    const { data, error } = await supabase.from('profiles').select('username').in('username', candidates);
+    if (error) {
+      return candidates.slice(0, limit);
+    }
+
+    const taken = new Set(
+      (Array.isArray(data) ? data : [])
+        .map((r: any) => (typeof r?.username === 'string' ? r.username : null))
+        .filter(Boolean),
+    );
+
+    const available: string[] = [];
+    for (const c of candidates) {
+      if (!taken.has(c)) {
+        available.push(c);
+        if (available.length >= limit) break;
+      }
+    }
+
+    return available;
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -96,13 +178,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUpWithEmailPassword = async (email: string, password: string, username: string) => {
-    const trimmedUsername = (username ?? '').trim();
-    if (trimmedUsername.length < 3) {
+    const rawUsername = (username ?? '').trim();
+    const normalizedUsername = rawUsername.toLowerCase();
+
+    if (normalizedUsername.length < 3) {
       Alert.alert('Sign-up error', 'Username must be at least 3 characters long.');
       throw new Error('Invalid username');
     }
 
-    if (!/^[a-zA-Z0-9_.-]+$/.test(trimmedUsername)) {
+    if (!/^[a-zA-Z0-9_.-]+$/.test(rawUsername)) {
       Alert.alert('Sign-up error', 'Username can contain letters, numbers, and . _ - only.');
       throw new Error('Invalid username');
     }
@@ -111,8 +195,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: existing, error: usernameError } = await supabase
       .from('profiles')
       .select('id')
-      .eq('username', trimmedUsername)
-      .limit(1);
+      .eq('username', normalizedUsername)
+      .maybeSingle();
 
     if (usernameError && usernameError.code !== 'PGRST116') {
       Alert.alert('Sign-up error', usernameError.message);
@@ -129,7 +213,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       password,
       options: {
         data: {
-          username: trimmedUsername,
+          username: normalizedUsername,
         },
       },
     });
@@ -147,7 +231,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { error: profileError } = await supabase
       .from('profiles')
       .update({
-        username: trimmedUsername,
+        username: normalizedUsername,
         terms_accepted_at: now,
         privacy_accepted_at: now,
         consent_version: consentVersion,
@@ -166,7 +250,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(data.user);
     }
 
-    Alert.alert('Account created', 'Your account has been created. Let’s complete your profile.');
+    toast.show('Account created successfully');
   };
 
   const signInWithIdentifierPassword = async (identifier: string, password: string) => {
@@ -174,10 +258,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // If the user typed a username (no @), resolve it to an email via profiles
     if (!identifier.includes('@')) {
+      const normalizedIdentifier = (identifier ?? '').trim().toLowerCase();
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('email')
-        .eq('username', identifier)
+        .eq('username', normalizedIdentifier)
         .maybeSingle();
 
       if (profileError) {
@@ -241,6 +326,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         profileLoading,
         signUpWithEmailPassword,
         signInWithIdentifierPassword,
+        getUsernameSuggestions,
         resetPasswordForEmail,
         signOut,
         refreshProfile,

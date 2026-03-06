@@ -37,7 +37,23 @@ const ViewUserProfileScreen = lazyNamed(
   () => import('../screens/profile/ViewUserProfileScreen'),
   'ViewUserProfileScreen',
 );
-const MyProfileScreen = lazyNamed(() => import('../screens/profile/MyProfileScreen'), 'MyProfileScreen');
+const MyProfileScreen = lazyNamed(() => import('../screens/profile/ProfileHubScreen'), 'ProfileHubScreen');
+const ProfileBasicInfoScreen = lazyNamed(
+  () => import('../screens/profile/ProfileBasicInfoScreen'),
+  'ProfileBasicInfoScreen',
+);
+const ProfilePreferencesScreen = lazyNamed(
+  () => import('../screens/profile/ProfilePreferencesScreen'),
+  'ProfilePreferencesScreen',
+);
+const ProfilePhotosScreen = lazyNamed(
+  () => import('../screens/profile/ProfilePhotosScreen'),
+  'ProfilePhotosScreen',
+);
+const ProfileSupportPrivacyScreen = lazyNamed(
+  () => import('../screens/profile/ProfileSupportPrivacyScreen'),
+  'ProfileSupportPrivacyScreen',
+);
 const RequestVerificationScreen = lazyNamed(
   () => import('../screens/profile/RequestVerificationScreen'),
   'RequestVerificationScreen',
@@ -69,6 +85,10 @@ export type RootStackParamList = {
   Likes: undefined;
   Matches: undefined;
   MyProfile: undefined;
+  ProfileBasicInfo: undefined;
+  ProfilePreferences: undefined;
+  ProfilePhotos: undefined;
+  ProfileSupportPrivacy: undefined;
   RequestVerification: undefined;
   SupportCenter: undefined;
   ViewUserProfile: { userId: string };
@@ -87,20 +107,20 @@ export const RootNavigator = () => {
   if (loading || profileLoading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#F97316" />
+        <ActivityIndicator size="large" color="#ff4b2b" />
       </View>
     );
   }
 
   return (
-    <Suspense fallback={<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color="#F97316" /></View>}>
+    <Suspense fallback={<View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator size="large" color="#ff4b2b" /></View>}>
       <Stack.Navigator>
       {!session && (
         <>
           <Stack.Screen
             name="Login"
             component={LoginScreen}
-            options={{ title: 'UMUTIMA - Login' }}
+            options={{ title: 'Umutima - Login' }}
           />
           <Stack.Screen
             name="SignUp"
@@ -141,7 +161,7 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="Home"
             component={HomeScreen}
-            options={{ title: 'UMUTIMA' }}
+            options={{ title: 'Umutima' }}
           />
           <Stack.Screen
             name="ResetPassword"
@@ -174,6 +194,26 @@ export const RootNavigator = () => {
             options={{ title: 'My profile' }}
           />
           <Stack.Screen
+            name="ProfileBasicInfo"
+            component={ProfileBasicInfoScreen}
+            options={{ title: 'Basic information' }}
+          />
+          <Stack.Screen
+            name="ProfilePreferences"
+            component={ProfilePreferencesScreen}
+            options={{ title: 'Preferences' }}
+          />
+          <Stack.Screen
+            name="ProfilePhotos"
+            component={ProfilePhotosScreen}
+            options={{ title: 'Photos' }}
+          />
+          <Stack.Screen
+            name="ProfileSupportPrivacy"
+            component={ProfileSupportPrivacyScreen}
+            options={{ title: 'Support & privacy' }}
+          />
+          <Stack.Screen
             name="RequestVerification"
             component={RequestVerificationScreen}
             options={{ title: 'Request verification' }}
@@ -196,12 +236,12 @@ export const RootNavigator = () => {
           <Stack.Screen
             name="ViewUserProfile"
             component={ViewUserProfileScreen}
-            options={{ title: 'User profile' }}
+            options={{ headerShown: false }}
           />
           <Stack.Screen
             name="Chat"
             component={ChatScreen}
-            options={{ title: 'Chat' }}
+            options={{ headerShown: false }}
           />
         </>
       )}

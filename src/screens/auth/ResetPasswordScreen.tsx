@@ -188,7 +188,7 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ naviga
 
         {!ready ? (
           <View style={styles.center}>
-            <ActivityIndicator size="large" color="#F97316" />
+            <ActivityIndicator size="large" color="#ff4b2b" />
           </View>
         ) : (
           <>

@@ -5,6 +5,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { getDailySuggestions, SuggestionProfile, sendLike } from '../../services/matching';
 import { useAuth } from '../../context/AuthContext';
+import { resolveAge } from '../../utils/age';
 
 const LIKE_LIMIT_KEY = 'matching.likes_today';
 const LIKE_LIMIT = 50;
@@ -107,6 +108,7 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({ navigation }) 
 
   const renderItem = ({ item }: { item: SuggestionProfile }) => {
     const photo = item.profile_photos?.[0];
+    const resolvedAge = resolveAge({ age: item.age, date_of_birth: item.date_of_birth });
     return (
       <View style={styles.card}>
         {photo ? (
@@ -118,7 +120,7 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({ navigation }) 
           </TouchableOpacity>
         ) : null}
         <Text style={styles.name}>
-          {item.name}, {item.age}
+          {item.name}{resolvedAge ? `, ${resolvedAge}` : ''}
           {(item as any)?.is_verified ? <Text style={styles.verifiedTick}> ✓</Text> : null}
         </Text>
         <Text style={styles.meta}>
@@ -136,7 +138,7 @@ export const DiscoveryScreen: React.FC<DiscoveryScreenProps> = ({ navigation }) 
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color="#ff4b2b" />
       </View>
     );
   }

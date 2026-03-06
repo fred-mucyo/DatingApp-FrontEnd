@@ -13,6 +13,8 @@ import {
   Modal,
   Share,
   TextInput,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
@@ -22,6 +24,9 @@ import { sendLike } from '../../services/matching';
 import { hasSentPreMatchMessage, sendPreMatchMessage, verifyMatchExists } from '../../services/chat';
 import { submitReport, ReportReason } from '../../services/reports';
 import { cacheService } from '../../services/cache';
+
+const ANDROID_STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight ?? 0 : 0;
+const ACCENT_COLOR = '#ff4b2b';
 
 export type ViewUserProfileScreenProps = NativeStackScreenProps<RootStackParamList, 'ViewUserProfile'>;
 
@@ -129,7 +134,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#F97316" />
+        <ActivityIndicator size="large" color={ACCENT_COLOR} />
       </View>
     );
   }
@@ -464,7 +469,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               activeOpacity={0.8}
               onPress={() => navigation.goBack()}
             >
-              <Text style={styles.topBarIcon}>←</Text>
+              <Text style={styles.topBarIcon}>Back</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -472,7 +477,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               activeOpacity={0.8}
               onPress={() => setMenuVisible(true)}
             >
-              <Text style={styles.topBarIcon}>⋯</Text>
+              <Text style={styles.topBarIcon}>Menu</Text>
             </TouchableOpacity>
           </View>
 
@@ -503,7 +508,6 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
 
               {usernameLabel && <Text style={styles.usernameText}>{usernameLabel}</Text>}
               <View style={styles.locationRow}>
-                <Text style={styles.locationIcon}>📍</Text>
                 <Text style={styles.locationText}>{locationLabel}</Text>
               </View>
             </View>
@@ -511,12 +515,10 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             {/* Compact stats row */}
             <View style={styles.statsRowCompact}>
               <View style={styles.statItem}>
-                <Text style={styles.statIcon}>💕</Text>
                 <Text style={styles.statText}>{relationshipGoalLabel}</Text>
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={styles.statIcon}>❤️</Text>
                 <Text style={styles.statText}>{genderPreferenceLabel}</Text>
               </View>
             </View>
@@ -533,7 +535,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
             {/* Shared interests highlight */}
             {hasMatch && sharedInterests.length > 0 && (
               <View style={styles.sharedInterestsCompact}>
-                <Text style={styles.sharedLabel}>✨ You both like: </Text>
+                <Text style={styles.sharedLabel}>You both like: </Text>
                 <Text style={styles.sharedText}>
                   {sharedInterests.slice(0, 3).join(', ')}
                 </Text>
@@ -562,7 +564,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
               onPress={handleStartChat}
               disabled={actionLoading}
             >
-              <Text style={styles.primaryButtonText}>💬 Send Message</Text>
+              <Text style={styles.primaryButtonText}>Send Message</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.bottomButtonsRow}>
@@ -572,23 +574,23 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
                 onPress={() => navigation.goBack()}
                 disabled={actionLoading}
               >
-                <Text style={styles.passButtonText}>✕</Text>
+                <Text style={styles.passButtonText}>×</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.messageButton}
+                style={styles.secondaryPillButton}
                 activeOpacity={0.9}
                 onPress={handleOpenPreMatchComposer}
                 disabled={actionLoading}
               >
-                <Text style={styles.messageButtonText}>💬</Text>
+                <Text style={styles.secondaryPillButtonText}>Message</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={styles.primaryPillButton}
                 activeOpacity={0.9}
                 onPress={handleLike}
                 disabled={actionLoading}
               >
-                <Text style={styles.primaryButtonText}>❤️ Like</Text>
+                <Text style={styles.primaryPillButtonText}>Like</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -664,21 +666,21 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
                 activeOpacity={0.8}
                 onPress={openReportFlow}
               >
-                <Text style={styles.menuItemText}>🚩 Report user</Text>
+                <Text style={styles.menuItemText}>Report user</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.8}
                 onPress={handleBlockUser}
               >
-                <Text style={styles.menuItemText}>⛔ Block user</Text>
+                <Text style={styles.menuItemText}>Block user</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.menuItem}
                 activeOpacity={0.8}
                 onPress={handleShareProfile}
               >
-                <Text style={styles.menuItemText}>📤 Share profile</Text>
+                <Text style={styles.menuItemText}>Share profile</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -798,7 +800,7 @@ export const ViewUserProfileScreen: React.FC<ViewUserProfileScreenProps> = ({ ro
         >
           <View style={styles.matchModalBackdrop}>
             <View style={styles.matchModalCard}>
-              <Text style={styles.matchTitle}>🎉 It's a Match!</Text>
+              <Text style={styles.matchTitle}>It's a Match!</Text>
               <Text style={styles.matchSubtitle}>
                 You and {displayName} like each other
               </Text>
@@ -872,35 +874,36 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 320,
+    height: 280,
     backgroundColor: 'transparent',
   },
   topBar: {
     position: 'absolute',
-    top: 12,
+    top: 0,
     left: 16,
     right: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     zIndex: 10,
+    paddingTop: ANDROID_STATUSBAR_HEIGHT + 12,
   },
   topBarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    height: 40,
+    paddingHorizontal: 14,
+    borderRadius: 20,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   topBarIcon: {
     color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   paginationContainer: {
     position: 'absolute',
-    top: 70,
+    top: ANDROID_STATUSBAR_HEIGHT + 64,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -921,11 +924,11 @@ const styles = StyleSheet.create({
   },
   profileInfoOverlay: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 96,
     left: 0,
     right: 0,
-    paddingHorizontal: 20,
-    paddingTop: 16,
+    paddingHorizontal: 18,
+    paddingTop: 12,
     zIndex: 5,
   },
   nameSection: {
@@ -936,7 +939,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nameText: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '700',
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
@@ -945,7 +948,7 @@ const styles = StyleSheet.create({
   },
   usernameText: {
     marginTop: 2,
-    fontSize: 16,
+    fontSize: 14,
     color: '#E5E7EB',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
@@ -961,7 +964,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   locationText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#F3F4F6',
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
@@ -1037,7 +1040,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(249, 115, 22, 0.25)',
+    backgroundColor: 'rgba(255, 75, 43, 0.25)',
   },
   interestTextCompact: {
     fontSize: 12,
@@ -1049,9 +1052,9 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    paddingHorizontal: 20,
-    paddingBottom: 28,
-    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 18,
+    paddingTop: 14,
     backgroundColor: 'rgba(0, 0, 0, 0.85)',
   },
   bottomButtonsRow: {
@@ -1060,51 +1063,61 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   passButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: 'rgba(239, 68, 68, 0.5)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
   },
   passButtonText: {
-    fontSize: 24,
-    color: '#EF4444',
-    fontWeight: '600',
-  },
-  messageButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  messageButtonText: {
-    fontSize: 20,
+    fontSize: 22,
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   primaryButton: {
     flex: 1,
-    height: 56,
-    borderRadius: 28,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F97316',
-    shadowColor: '#F97316',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: ACCENT_COLOR,
   },
   fullWidthButton: {
     flex: 1,
   },
   primaryButtonText: {
-    fontSize: 17,
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  secondaryPillButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  secondaryPillButtonText: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  primaryPillButton: {
+    flex: 1,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: ACCENT_COLOR,
+  },
+  primaryPillButtonText: {
+    fontSize: 16,
     color: '#FFFFFF',
     fontWeight: '700',
   },
@@ -1156,7 +1169,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F2937',
   },
   preMatchSendButton: {
-    backgroundColor: '#F97316',
+    backgroundColor: ACCENT_COLOR,
   },
   preMatchCancelText: {
     color: '#FFFFFF',

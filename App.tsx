@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, Montserrat_900Black } from '@expo-google-fonts/montserrat';
 import { AuthProvider } from './src/context/AuthContext';
+import { ToastProvider } from './src/components/Toast';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import * as Notifications from 'expo-notifications';
 import { navigationRef } from './src/navigation/navigationRef';
@@ -69,12 +70,14 @@ export default function App() {
   // Text using Montserrat_900Black will temporarily fall back to the system font.
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <NavigationContainer ref={navigationRef} linking={linking}>
-          <RootNavigator />
-          <StatusBar style="dark" />
-        </NavigationContainer>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <NavigationContainer ref={navigationRef} linking={linking}>
+            <RootNavigator />
+            <StatusBar style="dark" />
+          </NavigationContainer>
+        </AuthProvider>
+      </ToastProvider>
     </SafeAreaProvider>
   );
 }

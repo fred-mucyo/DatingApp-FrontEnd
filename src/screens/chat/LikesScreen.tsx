@@ -11,12 +11,14 @@ import {
   Alert,
   Image,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../config/supabaseClient';
 import { denyLike, fetchIncomingLikes, IncomingLikeProfile, likeBackAndRemove } from '../../services/likes';
 import { cacheService } from '../../services/cache';
+import { resolveAge } from '../../utils/age';
 
 export type LikesScreenProps = NativeStackScreenProps<RootStackParamList, 'Likes'>;
 
@@ -28,8 +30,29 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const PAGE_SIZE = 20;
-  const [actioningId, setActioningId] = useState<string | null>(null);
+  const [actioning, setActioning] = useState<Record<string, 'deny' | 'likeBack' | null>>({});
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  const LikeIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
+        fill={color}
+      />
+    </Svg>
+  );
+
+  const VerifiedIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 6 9 17l-5-5"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
 
   const loadLikes = useCallback(async (showLoading = false, pageNum = 0) => {
     if (!user) return;
@@ -112,7 +135,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
 
   const handleLikeBack = async (item: IncomingLikeProfile) => {
     if (!user) return;
-    setActioningId(item.like_id);
+    setActioning((prev) => ({ ...prev, [item.like_id]: 'likeBack' }));
     try {
       await likeBackAndRemove(user.id, item.user_id, item.like_id);
       setItems((prev) => prev.filter((p) => p.like_id !== item.like_id));
@@ -123,13 +146,13 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to like back');
     } finally {
-      setActioningId(null);
+      setActioning((prev) => ({ ...prev, [item.like_id]: null }));
     }
   };
 
   const handleDeny = async (item: IncomingLikeProfile) => {
     if (!user) return;
-    setActioningId(item.like_id);
+    setActioning((prev) => ({ ...prev, [item.like_id]: 'deny' }));
     try {
       await denyLike(item.like_id);
       setItems((prev) => prev.filter((p) => p.like_id !== item.like_id));
@@ -138,13 +161,17 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to remove like');
     } finally {
-      setActioningId(null);
+      setActioning((prev) => ({ ...prev, [item.like_id]: null }));
     }
   };
 
   const renderItem = ({ item }: { item: IncomingLikeProfile }) => {
     const photo = item.profile_photos && item.profile_photos[0];
-    const busy = actioningId === item.like_id;
+    const currentAction = actioning[item.like_id] ?? null;
+    const busyDeny = currentAction === 'deny';
+    const busyLikeBack = currentAction === 'likeBack';
+    const anyBusy = !!currentAction;
+    const resolvedAge = resolveAge({ age: item.age, date_of_birth: item.date_of_birth });
 
     return (
       <View style={styles.card}>
@@ -164,10 +191,17 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
           )}
 
           <View style={styles.cardInfo}>
-            <Text style={styles.name} numberOfLines={1}>
-              {(item.name ?? 'Unknown user')}{item.is_verified ? ' ✓' : ''}
-              {item.age ? `, ${item.age}` : ''}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text style={styles.name} numberOfLines={1}>
+                {(item.name ?? 'Unknown user')}
+                {resolvedAge ? `, ${resolvedAge}` : ''}
+              </Text>
+              {item.is_verified ? (
+                <View style={styles.verifiedIconWrap}>
+                  <VerifiedIcon />
+                </View>
+              ) : null}
+            </View>
             {!!(item.city || item.country) && (
               <Text style={styles.location} numberOfLines={1}>
                 {[item.city, item.country].filter(Boolean).join(', ')}
@@ -181,18 +215,26 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
           <TouchableOpacity
             style={[styles.actionButton, styles.denyButton]}
             activeOpacity={0.8}
-            disabled={busy}
+            disabled={anyBusy}
             onPress={() => handleDeny(item)}
           >
-            <Text style={styles.denyText}>{busy ? 'Removing...' : 'Deny'}</Text>
+            {busyDeny ? (
+              <ActivityIndicator size="small" color="#111827" />
+            ) : (
+              <Text style={styles.denyText}>Deny</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.likeBackButton]}
             activeOpacity={0.8}
-            disabled={busy}
+            disabled={anyBusy}
             onPress={() => handleLikeBack(item)}
           >
-            <Text style={styles.likeBackText}>{busy ? 'Matching...' : 'Like back'}</Text>
+            {busyLikeBack ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.likeBackText}>Like back</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -202,7 +244,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
   const emptyState = (
     <View style={styles.emptyWrapper}>
       <View style={styles.emptyIllustration}>
-        <Text style={styles.emptyIcon}>❤️</Text>
+        <LikeIcon />
       </View>
       <Text style={styles.emptyTitle}>No likes yet</Text>
       <Text style={styles.emptySubtitle}>
@@ -232,7 +274,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
         <View style={styles.contentArea}>
           {loading && !hasLoadedOnce ? (
             <View style={styles.center}>
-              <ActivityIndicator size="large" color="#F97316" />
+              <ActivityIndicator size="large" color="#ff4b2b" />
             </View>
           ) : items.length === 0 && hasLoadedOnce && !refreshing ? (
             emptyState
@@ -249,7 +291,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
                 setPage(0);
                 loadLikes(true, 0);
               }}
-              ListFooterComponent={loading && hasLoadedOnce ? <ActivityIndicator size="small" color="#F97316" /> : null}
+              ListFooterComponent={loading && hasLoadedOnce ? <ActivityIndicator size="small" color="#ff4b2b" /> : null}
             />
           )}
         </View>
@@ -261,7 +303,7 @@ export const LikesScreen: React.FC<LikesScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#1A1A1A',
   },
   container: {
     flex: 1,
@@ -304,7 +346,7 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   avatarPlaceholder: {
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -316,10 +358,24 @@ const styles = StyleSheet.create({
   cardInfo: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   name: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1A1A1A',
+    marginBottom: 4,
+  },
+  verifiedIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF1F0',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 4,
   },
   location: {
@@ -348,7 +404,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   likeBackButton: {
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
     marginLeft: 8,
   },
   denyText: {
@@ -382,18 +438,18 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A1A1A',
+    color: '#FFFFFF',
     marginBottom: 6,
     textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#9CA3AF',
     textAlign: 'center',
     marginBottom: 16,
   },
   emptyCtaButton: {
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
     borderRadius: 999,
     paddingHorizontal: 24,
     paddingVertical: 12,

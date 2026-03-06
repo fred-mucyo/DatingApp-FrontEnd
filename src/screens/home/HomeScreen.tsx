@@ -32,6 +32,8 @@ import { verifyMatchExists, hasSentPreMatchMessage, sendPreMatchMessage, fetchMa
 import { fetchIncomingLikes } from '../../services/likes';
 import { supabase } from '../../config/supabaseClient';
 import { cacheService } from '../../services/cache';
+import { resolveAge } from '../../utils/age';
+import { OnboardingTour, TourLanguage } from '../../components/OnboardingTour';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -56,6 +58,12 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [newLikesCount, setNewLikesCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+
+  const TOUR_COMPLETED_KEY = 'onboarding.tour_completed.v1';
+  const TOUR_LANGUAGE_KEY = 'onboarding.tour_language';
+  const [tourVisible, setTourVisible] = useState(false);
+  const [tourLanguage, setTourLanguage] = useState<TourLanguage | null>(null);
+  const tourInitDoneRef = useRef(false);
 
   const VISIBLE_PROFILES_COUNT = 10;
 
@@ -173,6 +181,25 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     if (!user) return;
 
+    if (!tourInitDoneRef.current) {
+      tourInitDoneRef.current = true;
+      (async () => {
+        try {
+          const completed = await AsyncStorage.getItem(TOUR_COMPLETED_KEY);
+          if (completed === 'true') return;
+          const savedLang = await AsyncStorage.getItem(TOUR_LANGUAGE_KEY);
+          if (savedLang === 'en' || savedLang === 'rw') {
+            setTourLanguage(savedLang);
+          } else {
+            setTourLanguage(null);
+          }
+          setTourVisible(true);
+        } catch {
+          setTourVisible(true);
+        }
+      })();
+    }
+
     // Register for push notifications once a user is available
     registerForPushNotificationsAsync().catch(() => {});
 
@@ -217,6 +244,24 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     
     loadCached();
   }, [user, loadLikesToday, loadSuggestions, shuffleArray]);
+
+  const completeTour = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(TOUR_COMPLETED_KEY, 'true');
+    } catch {
+      // ignore
+    }
+    setTourVisible(false);
+  }, []);
+
+  const handleSelectTourLanguage = useCallback(async (language: TourLanguage) => {
+    setTourLanguage(language);
+    try {
+      await AsyncStorage.setItem(TOUR_LANGUAGE_KEY, language);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // ---- Badge counts for bottom navigation ----
 
@@ -536,34 +581,57 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   // Icons
-  const PassIcon = () => (
-    <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
+  const PassIcon = ({ color = '#FFFFFF' }: { color?: string }) => (
+    <Svg width={30} height={30} viewBox="0 0 24 24" fill="none">
       <Path
         d="M6 6l12 12M18 6L6 18"
-        stroke="#FFFFFF"
-        strokeWidth={3}
-        strokeLinecap="round"
-      />
-    </Svg>
-  );
-
-  const LikeIcon = () => (
-    <Svg width={32} height={32} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
-        fill="#FFFFFF"
-      />
-    </Svg>
-  );
-
-  const MessageIcon = () => (
-    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
-        stroke="#FFFFFF"
+        stroke={color}
         strokeWidth={2}
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const LikeIcon = ({ color = '#FFFFFF' }: { color?: string }) => (
+    <Svg width={30} height={30} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
+        fill={color}
+      />
+    </Svg>
+  );
+
+  const MessageIcon = ({ color = '#FFFFFF' }: { color?: string }) => (
+    <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const VerifiedIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 6 9 17l-5-5"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const SparkleIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={56} height={56} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 2.5l1.8 5.8 5.7 1.7-5.7 1.7-1.8 5.8-1.8-5.8-5.7-1.7 5.7-1.7L12 2.5Z"
+        fill={color}
+        opacity={0.95}
       />
     </Svg>
   );
@@ -770,9 +838,16 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.profileInfo}>
             <View style={styles.nameRow}>
               <Text style={styles.profileName}>
-                {item.name}, {item.age}
+                {item.name}{(() => {
+                  const age = resolveAge({ age: item.age, date_of_birth: item.date_of_birth });
+                  return age ? `, ${age}` : '';
+                })()}
               </Text>
-              {(item as any)?.is_verified ? <Text style={styles.verifiedTick}>✓</Text> : null}
+              {item.is_verified ? (
+                <View style={styles.verifiedIconWrap}>
+                  <VerifiedIcon />
+                </View>
+              ) : null}
               {relationshipGoal && (
                 <View style={styles.intentBadge}>
                   <Svg width={12} height={12} viewBox="0 0 24 24" fill="none" style={styles.intentBadgeIcon}>
@@ -810,18 +885,6 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
           <TouchableOpacity
-            style={[styles.actionButton, styles.passButton]}
-            onPress={() => handlePass(item)}
-            disabled={liking}
-          >
-            <PassIcon />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.actionButton, styles.messageButton]} onPress={() => handleMessage(item.id)}>
-            <MessageIcon />
-          </TouchableOpacity>
-
-          <TouchableOpacity
             style={[styles.actionButton, styles.likeButton]}
             onPress={() => handleLike(item)}
             disabled={liking || alreadyLiked}
@@ -831,8 +894,24 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
             ) : alreadyLiked ? (
               <Text style={styles.likedLabel}>Liked</Text>
             ) : (
-              <LikeIcon />
+              <LikeIcon color="#FFFFFF" />
             )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.messageButton]}
+            onPress={() => handleMessage(item.id)}
+            disabled={liking}
+          >
+            <MessageIcon color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.passButton]}
+            onPress={() => handlePass(item)}
+            disabled={liking}
+          >
+            <PassIcon color="#111827" />
           </TouchableOpacity>
         </View>
       </View>
@@ -840,16 +919,25 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.safeArea}>
-      <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
+      <OnboardingTour
+        visible={tourVisible}
+        selectedLanguage={tourLanguage}
+        onClose={completeTour}
+        onSelectLanguage={handleSelectTourLanguage}
+        onComplete={completeTour}
+      />
+      <View style={styles.header}>
         {loadingSuggestions ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#F97316" />
+            <ActivityIndicator size="large" color="#ff4b2b" />
             <Text style={styles.loadingText}>Loading suggestions...</Text>
           </View>
         ) : suggestions.length === 0 ? (
           <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyIcon}>💫</Text>
+            <View style={styles.emptyIcon}>
+              <SparkleIcon />
+            </View>
             <Text style={styles.emptyTitle}>You're All Caught Up!</Text>
             <Text style={styles.emptySubtitle}>Check back tomorrow for fresh connections</Text>
             <TouchableOpacity style={styles.exploreButton} onPress={() => navigation.navigate('Explore')}>
@@ -988,6 +1076,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1A1A1A',
+    paddingBottom: Platform.OS === 'ios' ? 96 : 86,
   },
   skeletonContainer: {
     flexDirection: 'row',
@@ -1030,7 +1119,8 @@ const styles = StyleSheet.create({
   carouselContent: {
     alignItems: 'center',
     justifyContent: 'flex-start',
-    paddingTop: 0,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 20,
   },
   cardWrapper: {
     width: width,
@@ -1051,11 +1141,11 @@ const styles = StyleSheet.create({
     elevation: 8,
     overflow: 'hidden',
     width: '100%',
-    maxHeight: height * 0.78,
+    maxHeight: height * 0.74,
   },
   photoContainer: {
     width: '100%',
-    height: height * 0.48,
+    height: height * 0.44,
     position: 'relative',
     backgroundColor: '#F3F4F6',
     overflow: 'hidden',
@@ -1130,16 +1220,18 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
     letterSpacing: -0.5,
   },
-  verifiedTick: {
-    color: '#F97316',
-    fontWeight: '900',
-    fontSize: 18,
-    marginTop: 2,
+  verifiedIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF1F0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   intentBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EF4444',
+    backgroundColor: '#ff4b2b',
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -1193,12 +1285,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 24,
     marginTop: 16,
-    marginBottom: 16,
+    marginBottom: 18,
   },
   actionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 35,
+    width: 52,
+    height: 52,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -1206,16 +1298,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 6,
-    marginBottom: 70,
   },
   passButton: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
   messageButton: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#111827',
   },
   likeButton: {
-    backgroundColor: '#22C55E',
+    backgroundColor: '#ff4b2b',
   },
   likedLabel: {
     fontSize: 12,
@@ -1244,8 +1337,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyIcon: {
-    fontSize: 72,
-    marginBottom: 8,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyTitle: {
     fontSize: 26,
@@ -1267,8 +1361,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 36,
     paddingVertical: 16,
     borderRadius: 28,
-    backgroundColor: '#F97316',
-    shadowColor: '#F97316',
+    backgroundColor: '#ff4b2b',
+    shadowColor: '#ff4b2b',
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 12,
@@ -1393,7 +1487,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#374151',
   },
   modalSendButton: {
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
   },
   modalCancelText: {
     color: '#E5E7EB',

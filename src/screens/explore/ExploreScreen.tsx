@@ -10,11 +10,13 @@ import {
   SafeAreaView,
   Image,
 } from 'react-native';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { supabase } from '../../config/supabaseClient';
+import { resolveAge } from '../../utils/age';
 
 type ExploreScreenProps = NativeStackScreenProps<RootStackParamList, 'Explore'>;
 
@@ -22,6 +24,7 @@ interface ExploreProfile {
   id: string;
   name: string | null;
   age: number | null;
+  date_of_birth?: string | null;
   gender: string | null;
   city: string | null;
   country: string | null;
@@ -42,13 +45,56 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
   const [preferredOffset, setPreferredOffset] = useState(0);
   const [otherOffset, setOtherOffset] = useState(0);
 
+  const SearchIcon = ({ color = '#111827' }: { color?: string }) => (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Circle cx={11} cy={11} r={7} stroke={color} strokeWidth={2} />
+      <Path d="M20 20l-3.5-3.5" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+
+  const LocationIcon = ({ color = '#9CA3AF' }: { color?: string }) => (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 22s7-4.35 7-12a7 7 0 1 0-14 0c0 7.65 7 12 7 12Z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={10} r={2} fill={color} />
+    </Svg>
+  );
+
+  const VerifiedIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 6 9 17l-5-5"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const UserIcon = ({ color = '#9CA3AF' }: { color?: string }) => (
+    <Svg width={30} height={30} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 21a8 8 0 0 0-16 0"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+      />
+      <Circle cx={12} cy={8} r={4} stroke={color} strokeWidth={2} />
+    </Svg>
+  );
+
   const fetchProfilesByName = useCallback(
     async (offset: number): Promise<ExploreProfile[]> => {
       if (!user) return [];
       const name = nameFilter.trim();
       let query = supabase
         .from('profiles')
-        .select('id, name, age, gender, city, country, photos, is_verified')
+        .select('id, name, age, date_of_birth, gender, city, country, photos, is_verified')
         .eq('is_complete', true)
         .neq('id', user.id)
         .order('created_at', { ascending: false })
@@ -80,7 +126,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
       const base = () =>
         supabase
           .from('profiles')
-          .select('id, name, age, gender, city, country, photos, is_verified')
+          .select('id, name, age, date_of_birth, gender, city, country, photos, is_verified')
           .eq('is_complete', true)
           .neq('id', user.id)
           .order('created_at', { ascending: false });
@@ -215,6 +261,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
 
   const renderItem = ({ item }: { item: ExploreProfile }) => {
     const mainPhoto = item.photos && item.photos[0];
+    const resolvedAge = resolveAge({ age: item.age, date_of_birth: item.date_of_birth });
     return (
       <TouchableOpacity
         style={styles.card}
@@ -225,19 +272,26 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           <Image source={{ uri: mainPhoto }} style={styles.photo} resizeMode="cover" />
         ) : (
           <View style={styles.photoPlaceholder}>
-            <Text style={styles.placeholderIcon}>👤</Text>
+            <UserIcon />
           </View>
         )}
         <View style={styles.cardOverlay} />
         <View style={styles.cardInfo}>
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name ?? 'Unknown'}
-            {item.age ? `, ${item.age}` : ''}
-            {item.is_verified ? <Text style={styles.verifiedTick}> ✓</Text> : null}
-          </Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>
+              {item.name ?? 'Unknown'}
+              {resolvedAge ? `, ${resolvedAge}` : ''}
+            </Text>
+            {item.is_verified ? (
+              <View style={styles.verifiedIconWrap}>
+                <VerifiedIcon />
+              </View>
+            ) : null}
+          </View>
+
           {(!!item.city || !!item.country) && (
             <View style={styles.locationRow}>
-              <Text style={styles.locationIcon}>📍</Text>
+              <LocationIcon />
               <Text style={styles.meta} numberOfLines={1}>
                 {[item.city, item.country].filter(Boolean).join(', ')}
               </Text>
@@ -262,6 +316,9 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
             <View style={styles.scrollContent}>
               <View style={styles.searchBarContainer}>
                 <View style={styles.searchBar}>
+                  <View style={styles.searchIconInline}>
+                    <SearchIcon color="#6B7280" />
+                  </View>
                   <TextInput
                     style={styles.searchInput}
                     placeholder="Search by name..."
@@ -276,7 +333,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
                     activeOpacity={0.8}
                     style={styles.searchIconButton}
                   >
-                    <Text style={styles.searchIcon}>🔍</Text>
+                    <SearchIcon color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -291,7 +348,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = ({ navigation }) => {
           ListFooterComponent={
             <View style={styles.footerContainer}>
               {loading ? (
-                <ActivityIndicator size="small" color="#F97316" />
+                <ActivityIndicator size="small" color="#ff4b2b" />
               ) : hasMore && profiles.length > 0 ? (
                 <TouchableOpacity
                   onPress={handleShowMore}
@@ -314,186 +371,181 @@ export default ExploreScreen;
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: '#1A1A1A',
   },
   container: {
     flex: 1,
+    backgroundColor: '#1A1A1A',
+  },
+  listContent: {
+    paddingBottom: 24,
+    paddingTop: 6,
+  },
+  columnWrapper: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    columnGap: 12,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 12,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
   searchBarContainer: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 999,
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    paddingLeft: 12,
+    paddingRight: 8,
+    paddingVertical: 10,
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  searchIconInline: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
   },
   searchInput: {
     flex: 1,
     fontSize: 15,
     color: '#111827',
-    paddingVertical: 4,
+    paddingVertical: 0,
   },
   searchIconButton: {
-    marginLeft: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-    borderRadius: 999,
-  },
-  searchIcon: {
-    fontSize: 20,
-  },
-  infoContainer: {
-    backgroundColor: '#FEF2F2',
-    borderRadius: 14,
-    padding: 18,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  info: {
-    textAlign: 'center',
-    color: '#991B1B',
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 20,
-  },
-  listContent: {
-    paddingTop: 8,
-    paddingBottom: 24,
-  },
-  footerContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#ff4b2b',
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: 8,
   },
-  showMoreButton: {
+  infoContainer: {
     marginTop: 8,
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    backgroundColor: '#111827',
+    padding: 10,
+    backgroundColor: 'rgba(255, 75, 43, 0.12)',
+    borderRadius: 12,
   },
-  showMoreText: {
+  info: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.2,
-  },
-  columnWrapper: {
-    justifyContent: 'space-between',
+    fontSize: 13,
   },
   card: {
-    width: '48%',
+    flex: 1,
+    height: 240,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOpacity: 0.08,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 12,
-    elevation: 4,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    marginBottom: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 14,
+    elevation: 6,
   },
   photo: {
     width: '100%',
-    height: 200,
+    height: '100%',
   },
   photoPlaceholder: {
     width: '100%',
-    height: 200,
-    backgroundColor: '#FF6B6B',
+    height: '100%',
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  placeholderIcon: {
-    fontSize: 64,
-    opacity: 0.4,
-  },
   cardOverlay: {
     position: 'absolute',
-    bottom: 0,
     left: 0,
     right: 0,
-    height: 80,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    bottom: 0,
+    height: 64,
+    backgroundColor: 'rgba(0,0,0,0.4)',
   },
   cardInfo: {
-    paddingHorizontal: 12,
-    paddingVertical: 12,
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    left: 10,
+    right: 10,
+    bottom: 10,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   name: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-    marginBottom: 4,
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  verifiedTick: {
-    color: '#F97316',
-    fontWeight: '900',
+  verifiedIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  locationIcon: {
-    fontSize: 11,
-    marginRight: 4,
+    marginTop: 6,
+    gap: 6,
   },
   meta: {
-    fontSize: 13,
-    color: '#FFFFFF',
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '500',
     flex: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
-  filterActionsRow: {
-    flexDirection: 'row',
+  footerContainer: {
+    paddingVertical: 18,
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     marginTop: 4,
-  },
-  clearButton: {
-    paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  clearAllText: {
-    fontSize: 14,
-    color: '#6B7280',
-    fontWeight: '600',
+  showMoreButton: {
+    width: '100%',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 999,
+    backgroundColor: '#ff4b2b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ff4b2b',
+    shadowOpacity: 0.28,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  showMoreText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 15,
+    letterSpacing: 0.2,
   },
   applyButton: {
     flex: 1,
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 12,
-    shadowColor: '#F97316',
+    shadowColor: '#ff4b2b',
     shadowOpacity: 0.3,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,

@@ -4,8 +4,10 @@ export type GenderPreference = 'male' | 'female' | 'other' | 'all';
 
 export interface Profile {
   id: string; // auth.users.id
+  username?: string | null;
   name: string;
   age: number;
+  date_of_birth?: string | null;
   gender: Gender;
   city: string;
   country: string;

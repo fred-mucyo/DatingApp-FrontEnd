@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
+import Svg, { Path, Circle } from 'react-native-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -49,6 +50,38 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
   const [matches, setMatches] = useState<MatchItem[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+
+  const VerifiedIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 6 9 17l-5-5"
+        stroke={color}
+        strokeWidth={2.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const ChatBubbleIcon = ({ color = '#ff4b2b' }: { color?: string }) => (
+    <Svg width={44} height={44} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+        stroke={color}
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+
+  const isActiveRecently = (m: MatchItem): boolean => {
+    const t = m.last_message_created_at;
+    if (!t) return false;
+    if (m.last_message_sender_id !== m.other_user_id) return false;
+    const diffMs = Date.now() - new Date(t).getTime();
+    return diffMs >= 0 && diffMs <= 5 * 60 * 1000;
+  };
 
   const loadMatches = useCallback(async (showLoading = false) => {
     if (!user) return;
@@ -182,7 +215,7 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
     const isDelivered = !!item.last_message_delivered_at;
 
     // 1 tick = sent, 2 ticks = delivered, 2 orange ticks = read
-    const tickColor = isRead ? '#F97316' : '#9CA3AF'; // Primary color if read, gray if not
+    const tickColor = isRead ? '#ff4b2b' : '#9CA3AF'; // Primary color if read, gray if not
     const tickCount = isDelivered ? 2 : 1;
 
     return (
@@ -204,7 +237,8 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
   const renderItem = ({ item }: { item: MatchItem }) => {
     const unread = unreadCounts[item.id] ?? 0;
     const lastTimeLabel = formatTimeLabel(item.last_message_created_at ?? item.created_at ?? null);
-    const lastMessagePreview = item.last_message_content || `Say hi to ${item.other_user_name} 👋`;
+    const lastMessagePreview = item.last_message_content || `Say hi to ${item.other_user_name}`;
+    const active = isActiveRecently(item);
 
     return (
       <TouchableOpacity
@@ -222,13 +256,23 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
           ) : (
             <View style={[styles.avatar, styles.avatarPlaceholder]} />
           )}
+
+          {active ? <View style={styles.onlineDot} /> : null}
         </TouchableOpacity>
 
         <View style={styles.cardContent}>
           <View style={styles.cardTopRow}>
-            <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>
-              {item.other_user_name}{item.other_user_is_verified ? ' ✓' : ''}
-            </Text>
+            <View style={styles.nameRow}>
+              <Text style={[styles.name, unread > 0 && styles.nameUnread]} numberOfLines={1}>
+                {item.other_user_name}
+              </Text>
+              {item.other_user_is_verified ? (
+                <View style={styles.verifiedIconWrap}>
+                  <VerifiedIcon />
+                </View>
+              ) : null}
+              {active ? <Text style={styles.activeNowText}>Active</Text> : null}
+            </View>
             {!!lastTimeLabel && <Text style={styles.timeText}>{lastTimeLabel}</Text>}
           </View>
 
@@ -267,12 +311,12 @@ export const MatchesScreen: React.FC<MatchesScreenProps> = ({ navigation }) => {
         <View style={styles.contentArea}>
           {loading && !hasLoadedOnce ? (
             <View style={styles.center}>
-              <ActivityIndicator size="large" color="#F97316" />
+              <ActivityIndicator size="large" color="#ff4b2b" />
             </View>
           ) : totalMatches === 0 && hasLoadedOnce && !refreshing ? (
             <View style={styles.emptyStateWrapper}>
               <View style={styles.emptyIllustration}>
-                <Text style={styles.emptyIllustrationIcon}>💬</Text>
+                <ChatBubbleIcon />
               </View>
               <Text style={styles.emptyTitle}>No matches yet</Text>
               <Text style={styles.emptySubtitle}>
@@ -324,7 +368,7 @@ const styles = StyleSheet.create({
     color: '#6B7280',
   },
   statsUnreadText: {
-    color: '#F97316',
+    color: '#ff4b2b',
     fontWeight: '600',
   },
   contentArea: {
@@ -336,7 +380,7 @@ const styles = StyleSheet.create({
   cardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -344,6 +388,7 @@ const styles = StyleSheet.create({
   },
   avatarWrapper: {
     marginRight: 12,
+    position: 'relative',
   },
   avatar: {
     width: 48,
@@ -357,6 +402,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 24,
+  },
+  onlineDot: {
+    position: 'absolute',
+    right: -1,
+    bottom: -1,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#22C55E',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   cardContent: {
     flex: 1,
@@ -379,6 +435,26 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   nameUnread: {
+    fontWeight: '700',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 8,
+    marginRight: 8,
+  },
+  verifiedIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFF1F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeNowText: {
+    fontSize: 12,
+    color: '#16A34A',
     fontWeight: '700',
   },
   timeText: {
@@ -409,7 +485,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#ff4b2b',
     marginRight: 8,
   },
   messageTicksContainer: {
@@ -445,9 +521,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 24,
   },
-  emptyIllustrationIcon: {
-    fontSize: 40,
-  },
   emptyTitle: {
     fontSize: 20,
     fontWeight: '600',
@@ -467,7 +540,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F97316',
+    backgroundColor: '#ff4b2b',
+    shadowColor: '#ff4b2b',
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: 12,
+    elevation: 4,
   },
   emptyCtaText: {
     fontSize: 16,

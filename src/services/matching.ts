@@ -8,6 +8,7 @@ export interface SuggestionProfile {
   id: string;
   name: string;
   age: number;
+  date_of_birth?: string | null;
   gender: string;
   gender_preference: string;
   city: string;
@@ -163,7 +164,7 @@ const fetchLooseSuggestions = async (limit = 20, offset = 0): Promise<Suggestion
   let profilesQuery = supabase
     .from('profiles')
     .select(
-      'id, name, age, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos, photos, is_verified',
+      'id, name, age, date_of_birth, gender, gender_preference, city, country, relationship_goal, bio, interests, profile_photos, photos, is_verified',
     )
     .neq('id', me)
     .order('created_at', { ascending: false })

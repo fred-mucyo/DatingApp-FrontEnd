@@ -300,6 +300,7 @@ export const MyProfileScreen: React.FC<MyProfileScreenProps> = ({ navigation }) 
         <View style={styles.header}>
           <Text style={styles.title}>My Profile</Text>
           <Text style={styles.subtitle}>Keep your profile up to date</Text>
+          {profile.username ? <Text style={styles.username}>@{profile.username}</Text> : null}
         </View>
 
         <View style={styles.section}>
@@ -622,6 +623,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 15,
     color: '#666666',
+  },
+  username: {
+    marginTop: 6,
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,

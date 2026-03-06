@@ -5,6 +5,7 @@ export interface IncomingLikeProfile {
   user_id: string;
   name: string | null;
   age: number | null;
+  date_of_birth?: string | null;
   city: string | null;
   country: string | null;
   profile_photos: string[] | null;
@@ -31,7 +32,9 @@ export const fetchIncomingLikes = async (
 
   let query = supabase
     .from('likes')
-    .select('id, liker:profiles!likes_liker_id_fkey(id, name, age, city, country, profile_photos, photos, is_verified)')
+    .select(
+      'id, liker:profiles!likes_liker_id_fkey(id, name, age, date_of_birth, city, country, profile_photos, photos, is_verified)',
+    )
     .eq('liked_id', currentUserId)
     .order('created_at', { ascending: false });
 
@@ -68,6 +71,7 @@ export const fetchIncomingLikes = async (
         user_id: liker.id as string,
         name: (liker.name as string) ?? null,
         age: (liker.age as number) ?? null,
+        date_of_birth: (liker.date_of_birth as string) ?? null,
         city: (liker.city as string) ?? null,
         country: (liker.country as string) ?? null,
         profile_photos: resolvedPhotos,

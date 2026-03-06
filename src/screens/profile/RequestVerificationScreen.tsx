@@ -237,7 +237,7 @@ export const RequestVerificationScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color="#F97316" />
+          <ActivityIndicator size="large" color="#ff4b2b" />
         </View>
       </SafeAreaView>
     );
