@@ -12,12 +12,15 @@ export const uploadImageToCloudinary = async (uri: string): Promise<CloudinaryUp
 
   const data = new FormData();
   // Cloudinary expects file under `file` key
-  data.append('file', {
-    // @ts-ignore - React Native FormData file type
-    uri,
-    type: 'image/jpeg',
-    name: `upload-${Date.now()}.jpg`,
-  });
+  data.append(
+    'file',
+    {
+      // @ts-ignore - React Native FormData file type
+      uri,
+      type: 'image/jpeg',
+      name: `upload-${Date.now()}.jpg`,
+    } as any,
+  );
   data.append('upload_preset', env.cloudinaryUploadPreset);
 
   const res = await fetch(`https://api.cloudinary.com/v1_1/${env.cloudinaryCloudName}/image/upload`, {

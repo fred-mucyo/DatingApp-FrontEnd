@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import * as FileSystem from 'expo-file-system';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 import { useAuth } from '../../context/AuthContext';
 import { deleteMyAccount, requestMyDataExport } from '../../services/account';
@@ -23,7 +24,23 @@ export type ProfileSupportPrivacyScreenProps = NativeStackScreenProps<RootStackP
 export const ProfileSupportPrivacyScreen: React.FC<ProfileSupportPrivacyScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
 
+  const TOUR_COMPLETED_KEY = 'onboarding.tour_completed.v1';
+  const TOUR_REPLAY_REQUESTED_KEY = 'onboarding.tour_replay_requested.v1';
+
   const [busy, setBusy] = useState(false);
+
+  const handleReplayTour = useCallback(async () => {
+    try {
+      setBusy(true);
+      await AsyncStorage.removeItem(TOUR_COMPLETED_KEY);
+      await AsyncStorage.setItem(TOUR_REPLAY_REQUESTED_KEY, 'true');
+      navigation.navigate('Home');
+    } catch {
+      Alert.alert('Error', 'Failed to replay tour. Please try again.');
+    } finally {
+      setBusy(false);
+    }
+  }, [navigation]);
 
   const handleDeleteAccount = () => {
     if (!user) return;
@@ -138,6 +155,15 @@ export const ProfileSupportPrivacyScreen: React.FC<ProfileSupportPrivacyScreenPr
             disabled={busy}
           >
             <Text style={styles.itemText}>Export my data</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.item}
+            onPress={handleReplayTour}
+            activeOpacity={0.8}
+            disabled={busy}
+          >
+            <Text style={styles.itemText}>Replay tour</Text>
           </TouchableOpacity>
 
           <TouchableOpacity

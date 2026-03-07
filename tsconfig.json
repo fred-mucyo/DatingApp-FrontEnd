@@ -17,7 +17,8 @@
   },
   "include": [
     "src",
-    "App.tsx"
+    "App.tsx",
+    "supabase"
   ],
   "exclude": [
     "node_modules",

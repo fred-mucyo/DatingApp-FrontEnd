@@ -61,6 +61,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
   const TOUR_COMPLETED_KEY = 'onboarding.tour_completed.v1';
   const TOUR_LANGUAGE_KEY = 'onboarding.tour_language';
+  const TOUR_REPLAY_REQUESTED_KEY = 'onboarding.tour_replay_requested.v1';
   const [tourVisible, setTourVisible] = useState(false);
   const [tourLanguage, setTourLanguage] = useState<TourLanguage | null>(null);
   const tourInitDoneRef = useRef(false);
@@ -245,6 +246,32 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
     loadCached();
   }, [user, loadLikesToday, loadSuggestions, shuffleArray]);
 
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', () => {
+      (async () => {
+        try {
+          const replay = await AsyncStorage.getItem(TOUR_REPLAY_REQUESTED_KEY);
+          if (replay !== 'true') return;
+
+          await AsyncStorage.removeItem(TOUR_REPLAY_REQUESTED_KEY);
+
+          if (!tourLanguage) {
+            const savedLang = await AsyncStorage.getItem(TOUR_LANGUAGE_KEY);
+            if (savedLang === 'en' || savedLang === 'rw') {
+              setTourLanguage(savedLang);
+            }
+          }
+
+          setTourVisible(true);
+        } catch {
+          // ignore
+        }
+      })();
+    });
+
+    return unsub;
+  }, [TOUR_LANGUAGE_KEY, TOUR_REPLAY_REQUESTED_KEY, navigation, tourLanguage]);
+
   const completeTour = useCallback(async () => {
     try {
       await AsyncStorage.setItem(TOUR_COMPLETED_KEY, 'true');
@@ -262,6 +289,15 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
       // ignore
     }
   }, []);
+
+  // const handleReplayTour = useCallback(async () => {
+  //   try {
+  //     await AsyncStorage.removeItem(TOUR_COMPLETED_KEY);
+  //   } catch {
+  //     // ignore
+  //   }
+  //   setTourVisible(true);
+  // }, [TOUR_COMPLETED_KEY]);
 
   // ---- Badge counts for bottom navigation ----
 
@@ -837,12 +873,13 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           {/* Profile Info */}
           <View style={styles.profileInfo}>
             <View style={styles.nameRow}>
-              <Text style={styles.profileName}>
+              <Text style={styles.profileName} numberOfLines={1} ellipsizeMode="tail">
                 {item.name}{(() => {
                   const age = resolveAge({ age: item.age, date_of_birth: item.date_of_birth });
                   return age ? `, ${age}` : '';
                 })()}
               </Text>
+
               {item.is_verified ? (
                 <View style={styles.verifiedIconWrap}>
                   <VerifiedIcon />
@@ -863,12 +900,16 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
 
             <View style={styles.locationRow}>
               <LocationIcon />
-              <Text style={styles.locationText}>
+              <Text style={styles.locationText} numberOfLines={1} ellipsizeMode="tail">
                 {item.city} / {item.country}
               </Text>
             </View>
 
-            {item.bio && <Text style={styles.bioText}>{item.bio}</Text>}
+            {item.bio && (
+              <Text style={styles.bioText} numberOfLines={3} ellipsizeMode="tail">
+                {item.bio}
+              </Text>
+            )}
 
             {interests.length > 0 && (
               <View style={styles.interestsContainer}>
@@ -928,6 +969,9 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
         onComplete={completeTour}
       />
       <View style={styles.header}>
+        {/* <TouchableOpacity style={styles.replayTourButton} onPress={handleReplayTour}>
+          <Text style={styles.replayTourText}>Replay Tour</Text>
+        </TouchableOpacity> */}
         {loadingSuggestions ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#ff4b2b" />
@@ -1064,7 +1108,7 @@ export const HomeScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </Modal>
       </View>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -1076,8 +1120,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1A1A1A',
-    paddingBottom: Platform.OS === 'ios' ? 96 : 86,
+    paddingBottom: Platform.OS === 'ios' ? 58 : 50,
   },
+  header: {
+    flex: 1,
+  },
+  // replayTourButton: {
+  //   position: 'absolute',
+  //   top: 12,
+  //   right: 16,
+  //   zIndex: 10,
+  //   paddingHorizontal: 12,
+  //   paddingVertical: 8,
+  //   borderRadius: 16,
+  //   backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  //   borderWidth: 1,
+  //   borderColor: 'rgba(255, 255, 255, 0.16)',
+  // },
+  // replayTourText: {
+  //   color: '#FFFFFF',
+  //   fontSize: 12,
+  //   fontWeight: '700',
+  //   letterSpacing: 0.2,
+  // },
   skeletonContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -1118,16 +1183,17 @@ const styles = StyleSheet.create({
   },
   carouselContent: {
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    paddingTop: 14,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 20,
+    justifyContent: 'center',
+    flexGrow: 1,
+    paddingTop: 40,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 26,
   },
   cardWrapper: {
     width: width,
     alignItems: 'center',
-    justifyContent: 'flex-start',
+    justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingTop: 0,
+    paddingTop: 40,
   },
   profileCard: {
     backgroundColor: '#FFFFFF',
@@ -1152,9 +1218,10 @@ const styles = StyleSheet.create({
   },
   imageWrapper: {
     width: '100%',
-    height: '120%',
+    height: '100%',
     position: 'absolute',
     left: 0,
+    top: 0,
     overflow: 'hidden',
   },
   profilePhoto: {
@@ -1219,6 +1286,8 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1A1A1A',
     letterSpacing: -0.5,
+    flexShrink: 1,
+    maxWidth: '78%',
   },
   verifiedIconWrap: {
     width: 22,
@@ -1284,8 +1353,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 24,
-    marginTop: 16,
-    marginBottom: 18,
+    marginTop: 22,
+    marginBottom: Platform.OS === 'ios' ? 118 : 110,
   },
   actionButton: {
     width: 52,
@@ -1380,34 +1449,33 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: 'rgba(26, 26, 26, 0.95)',
-    // paddingTop: ,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 2 : 1,
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   bottomNav: {
     flexDirection: 'row',
     paddingHorizontal: 12,
-    paddingBottom: 8,
+    paddingBottom: 0,
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 0,
   },
   navIconCircle: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 2,
   },
   navLabel: {
-    fontSize: 11,
+    fontSize: 9,
     color: '#FFFFFF',
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: 0,
     letterSpacing: 0.2,
   },
   navLabelActive: {

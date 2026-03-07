@@ -17,6 +17,7 @@ interface AuthContextValue {
   signUpWithEmailPassword: (email: string, password: string, username: string) => Promise<void>;
   signInWithIdentifierPassword: (identifier: string, password: string) => Promise<void>;
   getUsernameSuggestions: (desiredUsername: string, limit?: number) => Promise<string[]>;
+  verifyEmailOtp: (email: string, token: string) => Promise<void>;
   resetPasswordForEmail: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -309,6 +310,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     );
   };
 
+  const verifyEmailOtp = async (email: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email',
+    });
+
+    if (error) {
+      Alert.alert('Verification error', error.message);
+      throw error;
+    }
+
+    if (data?.session) {
+      setSession(data.session);
+      setUser(data.session.user ?? null);
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
@@ -327,6 +346,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signUpWithEmailPassword,
         signInWithIdentifierPassword,
         getUsernameSuggestions,
+        verifyEmailOtp,
         resetPasswordForEmail,
         signOut,
         refreshProfile,

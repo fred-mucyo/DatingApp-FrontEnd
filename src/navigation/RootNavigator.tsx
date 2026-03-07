@@ -20,6 +20,7 @@ const lazyNamed = <T extends React.ComponentType<any>>(
 
 const LoginScreen = lazyNamed(() => import('../screens/auth/LoginScreen'), 'LoginScreen');
 const SignUpScreen = lazyNamed(() => import('../screens/auth/SignUpScreen'), 'SignUpScreen');
+const OtpScreen = lazyNamed(() => import('../screens/auth/OtpScreen'), 'OtpScreen');
 const ResetPasswordScreen = lazyNamed(
   () => import('../screens/auth/ResetPasswordScreen'),
   'ResetPasswordScreen',
@@ -75,6 +76,7 @@ const PrivacyPolicyScreen = lazyNamed(
 export type RootStackParamList = {
   Login: undefined;
   SignUp: undefined;
+  Otp: { email: string };
   ResetPassword: undefined;
   TermsOfService: undefined;
   PrivacyPolicy: undefined;
@@ -126,6 +128,11 @@ export const RootNavigator = () => {
             name="SignUp"
             component={SignUpScreen}
             options={{ title: 'Create Account' }}
+          />
+          <Stack.Screen
+            name="Otp"
+            component={OtpScreen}
+            options={{ title: 'Verify email' }}
           />
           <Stack.Screen
             name="ResetPassword"

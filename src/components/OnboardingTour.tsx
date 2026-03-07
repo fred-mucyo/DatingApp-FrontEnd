@@ -11,6 +11,7 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
 } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 const ACCENT_COLOR = '#ff4b2b';
 
@@ -21,12 +22,11 @@ type Copy = {
   chooseLanguageSubtitle: string;
   english: string;
   kinyarwanda: string;
-  skip: string;
   next: string;
   back: string;
   finish: string;
   tourTitle: string;
-  slides: Array<{ title: string; body: string }>;
+  slides: Array<{ title: string; body: string; highlight: 'like' | 'message' | 'pass' }>;
 };
 
 const copyByLanguage: Record<TourLanguage, Copy> = {
@@ -35,31 +35,25 @@ const copyByLanguage: Record<TourLanguage, Copy> = {
     chooseLanguageSubtitle: 'You can change this later in Settings.',
     english: 'English',
     kinyarwanda: 'Kinyarwanda',
-    skip: 'Skip',
     next: 'Next',
     back: 'Back',
     finish: 'Finish',
     tourTitle: 'Quick Tour',
     slides: [
       {
-        title: 'Welcome to Umutima',
-        body: 'We’ll show you the basics so you can start matching confidently.',
+        title: 'Like',
+        body: 'Tap Like when you’re interested. If they like you back, you match.',
+        highlight: 'like',
       },
       {
-        title: 'Explore',
-        body: 'Browse people and open profiles. Like someone to show interest.',
+        title: 'Pre-message',
+        body: 'Send a short message before matching to stand out and start a conversation.',
+        highlight: 'message',
       },
       {
-        title: 'Likes',
-        body: 'See who liked you and respond to connect faster.',
-      },
-      {
-        title: 'Matches & Chat',
-        body: 'When you both like each other, it’s a match. Start chatting instantly.',
-      },
-      {
-        title: 'Your Profile',
-        body: 'Add great photos and a short bio. A complete profile gets more matches.',
+        title: 'Pass',
+        body: 'Tap X to skip. You’ll see a new profile right away.',
+        highlight: 'pass',
       },
     ],
   },
@@ -68,31 +62,25 @@ const copyByLanguage: Record<TourLanguage, Copy> = {
     chooseLanguageSubtitle: 'Ushobora kuruhindura nyuma muri Settings.',
     english: 'Icyongereza',
     kinyarwanda: 'Ikinyarwanda',
-    skip: 'Simbuka',
     next: 'Komeza',
-    back: 'Subira',
+    back: 'Inyuma',
     finish: 'Rangiza',
-    tourTitle: 'Uko wakoresha',
+    tourTitle: 'Uko wakoresha Umutima',
     slides: [
       {
-        title: 'Murakaza neza kuri Umutima',
-        body: 'Tugiye kukwereka ib’ingenzi kugira ngo utangire gushaka uwo mukundana neza.',
+        title: 'Like',
+        body: 'Kanda Like (ku mutima) Niba uwo muntu umukunze. Naramuka agukunze na we, akora like back muhita mukora match.',
+        highlight: 'like',
       },
       {
-        title: 'Gushakisha',
-        body: 'Reba abantu, ufungure profiles. Kanda Like ku uwo ukunze.',
+        title: 'Ubutumwa bwa mbere',
+        body: 'Ohereza ubutumwa bugufi mbere ya match kugira ngo mu menyane vuba kandi mutangire ikiganiro.',
+        highlight: 'message',
       },
       {
-        title: 'Abagukunze',
-        body: 'Reba abagukunze kandi usubize vuba kugira ngo muhure.',
-      },
-      {
-        title: 'Matches & Ubutumwa',
-        body: 'Iyo mwese mukundanye bibaho Match. Hita utangira kuganira.',
-      },
-      {
-        title: 'Profile yawe',
-        body: 'Shyiramo amafoto meza na bio ngufi. Profile yuzuye ikururira matches nyinshi.',
+        title: 'X (Gusimbuka)',
+        body: 'Kanda X niba utamushaka. Uhita werekwa undi muntu.',
+        highlight: 'pass',
       },
     ],
   },
@@ -140,6 +128,56 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
     onComplete();
   };
 
+  const ActionIcon = ({ kind }: { kind: 'like' | 'message' | 'pass' }) => {
+    if (kind === 'like') {
+      return (
+        <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M12.001 5.5c-1.54-1.67-4.04-1.67-5.58 0-1.5 1.63-1.5 4.27 0 5.9l4.47 4.85a1 1 0 0 0 1.46 0l4.47-4.85c1.5-1.63 1.5-4.27 0-5.9-1.54-1.67-4.04-1.67-5.58 0Z"
+            fill="#FFFFFF"
+          />
+        </Svg>
+      );
+    }
+
+    if (kind === 'message') {
+      return (
+        <Svg width={26} height={26} viewBox="0 0 24 24" fill="none">
+          <Path
+            d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Svg>
+      );
+    }
+
+    return (
+      <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+        <Path d="M6 6l12 12M18 6L6 18" stroke="#111827" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      </Svg>
+    );
+  };
+
+  const ActionPreview = ({ kind }: { kind: 'like' | 'message' | 'pass' }) => {
+    const buttonStyle =
+      kind === 'like'
+        ? styles.actionPreviewLike
+        : kind === 'message'
+          ? styles.actionPreviewMessage
+          : styles.actionPreviewPass;
+
+    return (
+      <View style={styles.actionPreviewWrap}>
+        <View style={[styles.actionPreviewSingle, buttonStyle]}>
+          <ActionIcon kind={kind} />
+        </View>
+      </View>
+    );
+  };
+
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <SafeAreaView style={styles.backdrop}>
@@ -147,9 +185,6 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
           <View style={styles.header}>
             <Text style={styles.headerTitle}>{copy.tourTitle}</Text>
             <View style={styles.headerActions}>
-              <TouchableOpacity onPress={onClose} activeOpacity={0.85} style={styles.headerButton}>
-                <Text style={styles.headerButtonText}>{copy.skip}</Text>
-              </TouchableOpacity>
               <TouchableOpacity onPress={onClose} activeOpacity={0.85} style={styles.headerClose}>
                 <Text style={styles.headerCloseText}>×</Text>
               </TouchableOpacity>
@@ -183,10 +218,6 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                   <Text style={styles.languageButtonPrimaryText}>{copyByLanguage.rw.kinyarwanda}</Text>
                 </TouchableOpacity>
               </View>
-
-              <TouchableOpacity onPress={onClose} activeOpacity={0.9} style={styles.skipLink}>
-                <Text style={styles.skipLinkText}>{copy.skip}</Text>
-              </TouchableOpacity>
             </View>
           ) : (
             <>
@@ -204,6 +235,7 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
                 {slides.map((s, i) => (
                   <View key={`${s.title}_${i}`} style={styles.slide}>
                     <View style={styles.slideInner}>
+                      <ActionPreview kind={s.highlight} />
                       <Text style={styles.slideTitle}>{s.title}</Text>
                       <Text style={styles.slideBody}>{s.body}</Text>
                     </View>
@@ -259,16 +291,16 @@ export const OnboardingTour: React.FC<OnboardingTourProps> = ({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.78)',
+    backgroundColor: 'rgba(0, 0, 0, 0.62)',
     padding: 16,
     justifyContent: 'center',
   },
   card: {
-    backgroundColor: '#0B1220',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: 'rgba(17, 24, 39, 0.10)',
   },
   header: {
     flexDirection: 'row',
@@ -279,7 +311,7 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   headerTitle: {
-    color: '#FFFFFF',
+    color: '#111827',
     fontSize: 16,
     fontWeight: '800',
   },
@@ -288,27 +320,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
-  headerButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  headerButtonText: {
-    color: '#E5E7EB',
-    fontSize: 13,
-    fontWeight: '700',
-  },
   headerClose: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(17, 24, 39, 0.06)',
   },
   headerCloseText: {
-    color: '#FFFFFF',
+    color: '#111827',
     fontSize: 22,
     fontWeight: '700',
     marginTop: -2,
@@ -319,13 +340,13 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
   },
   languageTitle: {
-    color: '#FFFFFF',
+    color: '#111827',
     fontSize: 22,
     fontWeight: '800',
     marginBottom: 6,
   },
   languageSubtitle: {
-    color: '#9CA3AF',
+    color: '#4B5563',
     fontSize: 14,
     lineHeight: 20,
     marginBottom: 16,
@@ -350,27 +371,17 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#E5E7EB',
   },
   languageButtonSecondaryText: {
-    color: '#FFFFFF',
+    color: '#111827',
     fontSize: 16,
     fontWeight: '800',
   },
-  skipLink: {
-    marginTop: 14,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  skipLinkText: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    fontWeight: '700',
-  },
   slider: {
-    width: '100%',
+    marginTop: 12,
   },
   slide: {
     width: SCREEN_WIDTH,
@@ -381,21 +392,46 @@ const styles = StyleSheet.create({
   slideInner: {
     minHeight: 220,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderColor: '#E5E7EB',
     paddingHorizontal: 16,
     paddingVertical: 18,
     justifyContent: 'center',
   },
+  actionPreviewWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  actionPreviewSingle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  actionPreviewLike: {
+    backgroundColor: ACCENT_COLOR,
+    borderColor: 'rgba(255, 75, 43, 0.35)',
+  },
+  actionPreviewMessage: {
+    backgroundColor: '#111827',
+    borderColor: 'rgba(17, 24, 39, 0.12)',
+  },
+  actionPreviewPass: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+  },
   slideTitle: {
-    color: '#FFFFFF',
+    color: '#111827',
     fontSize: 22,
     fontWeight: '900',
     marginBottom: 8,
   },
   slideBody: {
-    color: '#D1D5DB',
+    color: '#4B5563',
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '600',
@@ -411,7 +447,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(17, 24, 39, 0.22)',
   },
   dotActive: {
     width: 18,
@@ -430,12 +466,12 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderColor: '#E5E7EB',
   },
   footerButtonSecondaryText: {
-    color: '#FFFFFF',
+    color: '#111827',
     fontSize: 16,
     fontWeight: '800',
   },
